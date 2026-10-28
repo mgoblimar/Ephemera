@@ -1,0 +1,108 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
+
+import 'package:ephemera_ai/models/scrap.dart';
+import 'package:ephemera_ai/models/segmentation.dart';
+
+abstract interface class ScrapRepository {
+  Future<List<Scrap>> getAll();
+
+  /// Saves the capture photo and its cutouts; returns the new scraps.
+  Future<List<Scrap>> saveCapture({
+    required Uint8List photoJpeg,
+    required List<CutoutScrap> cutouts,
+  });
+}
+
+/// Local-only archive: PNG/JPEG files plus a JSON index in the app documents dir.
+/// Simple and fast enough for hundreds of scraps; swap for a DB if it grows.
+class FileScrapRepository implements ScrapRepository {
+  FileScrapRepository(
+    this._root, {
+    Uuid uuid = const Uuid(),
+    DateTime Function()? clock,
+  }) : _uuid = uuid,
+       _clock = clock ?? DateTime.now;
+
+  final Directory _root;
+  final Uuid _uuid;
+  final DateTime Function() _clock;
+
+  File get _scrapIndex => File(p.join(_root.path, 'scraps.json'));
+  File get _captureIndex => File(p.join(_root.path, 'captures.json'));
+  Directory get _scrapDir => Directory(p.join(_root.path, 'scraps'));
+  Directory get _captureDir => Directory(p.join(_root.path, 'captures'));
+
+  @override
+  Future<List<Scrap>> getAll() async {
+    final scraps = (await _readList(_scrapIndex)).map(Scrap.fromJson).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return List.unmodifiable(scraps);
+  }
+
+  @override
+  Future<List<Scrap>> saveCapture({
+    required Uint8List photoJpeg,
+    required List<CutoutScrap> cutouts,
+  }) async {
+    await _scrapDir.create(recursive: true);
+    await _captureDir.create(recursive: true);
+    final now = _clock();
+    final captureId = _uuid.v4();
+
+    final photoPath = p.join(_captureDir.path, '$captureId.jpg');
+    await File(photoPath).writeAsBytes(photoJpeg, flush: true);
+
+    final scraps = <Scrap>[];
+    for (final cutout in cutouts) {
+      final id = _uuid.v4();
+      final pngPath = p.join(_scrapDir.path, '$id.png');
+      await File(pngPath).writeAsBytes(cutout.png, flush: true);
+      scraps.add(
+        Scrap(
+          id: id,
+          pngPath: pngPath,
+          width: cutout.width,
+          height: cutout.height,
+          source: ScrapSource.capture,
+          createdAt: now,
+          captureId: captureId,
+          palette: cutout.palette,
+        ),
+      );
+    }
+
+    final capture = Capture(
+      id: captureId,
+      photoPath: photoPath,
+      createdAt: now,
+      scrapIds: List.unmodifiable(scraps.map((s) => s.id)),
+    );
+    await _writeList(_captureIndex, [
+      ...await _readList(_captureIndex),
+      capture.toJson(),
+    ]);
+    await _writeList(_scrapIndex, [
+      ...await _readList(_scrapIndex),
+      ...scraps.map((s) => s.toJson()),
+    ]);
+    return List.unmodifiable(scraps);
+  }
+
+  Future<List<Map<String, dynamic>>> _readList(File file) async {
+    if (!await file.exists()) return const [];
+    final decoded = jsonDecode(await file.readAsString()) as List<dynamic>;
+    return decoded.cast<Map<String, dynamic>>();
+  }
+
+  /// Writes to a temp file then renames, so a crash mid-write can't corrupt the index.
+  Future<void> _writeList(File file, List<Map<String, dynamic>> items) async {
+    final temp = File('${file.path}.tmp');
+    await temp.writeAsString(jsonEncode(items), flush: true);
+    await temp.rename(file.path);
+  }
+}

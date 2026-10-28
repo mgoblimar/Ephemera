@@ -1,0 +1,85 @@
+import numpy as np
+from PIL import Image
+
+from app.image_store import ImageStore
+from app.imaging import apply_cut_style, dominant_palette, mask_bbox
+from app.providers.mock import ellipse_mask
+
+PHOTO = Image.new("RGB", (300, 200), (40, 90, 160))
+ALPHA = ellipse_mask(300, 200, cx=150, cy=100, rx=60, ry=40)
+
+
+def test_mask_bbox_of_empty_mask_is_none() -> None:
+    assert mask_bbox(np.zeros((10, 10), dtype=np.float32)) is None
+
+
+def test_mask_bbox_matches_ellipse() -> None:
+    x, y, w, h = mask_bbox(ALPHA)
+    assert abs(x - 90) <= 2 and abs(w - 120) <= 3
+    assert abs(y - 60) <= 2 and abs(h - 80) <= 3
+
+
+def test_margin_and_sticker_cuts_are_larger_than_tight() -> None:
+    tight = apply_cut_style(PHOTO, ALPHA, "tight", "m")
+    margin = apply_cut_style(PHOTO, ALPHA, "margin", "m")
+    sticker = apply_cut_style(PHOTO, ALPHA, "sticker", "l")
+    assert margin.width > tight.width and margin.height > tight.height
+    assert sticker.width > margin.width
+
+
+def test_bigger_cut_size_gives_bigger_margin() -> None:
+    small = apply_cut_style(PHOTO, ALPHA, "margin", "s")
+    large = apply_cut_style(PHOTO, ALPHA, "margin", "l")
+    assert large.width > small.width
+
+
+def _first_opaque_pixel_in_middle_row(image: Image.Image) -> np.ndarray:
+    pixels = np.asarray(image)
+    row = pixels[pixels.shape[0] // 2]
+    return row[np.flatnonzero(row[:, 3] > 250)[0]]
+
+
+def test_sticker_border_is_white_around_the_object() -> None:
+    sticker = apply_cut_style(PHOTO, ALPHA, "sticker", "l")
+    assert _first_opaque_pixel_in_middle_row(sticker)[:3].min() > 240
+    center = np.asarray(sticker)[sticker.height // 2, sticker.width // 2]
+    assert tuple(center) == (40, 90, 160, 255)
+
+
+def test_margin_border_keeps_the_photo_background() -> None:
+    margin = apply_cut_style(PHOTO, ALPHA, "margin", "l")
+    assert tuple(_first_opaque_pixel_in_middle_row(margin)[:3]) == (40, 90, 160)
+
+
+def test_dominant_palette_orders_by_frequency() -> None:
+    image = Image.new("RGBA", (10, 10), (255, 0, 0, 255))
+    image.paste((0, 0, 255, 255), (0, 0, 10, 3))
+    assert dominant_palette(image, colors=2) == ["#FF0000", "#0000FF"]
+
+
+def test_image_store_expires_entries() -> None:
+    now = [0.0]
+    store = ImageStore(ttl_seconds=10, clock=lambda: now[0])
+    image_id = store.put(PHOTO)
+    assert store.get(image_id).image is PHOTO
+    now[0] = 11.0
+    try:
+        store.get(image_id)
+    except Exception as exc:  # ApiError
+        assert getattr(exc, "code", None) == "image_not_found"
+    else:
+        raise AssertionError("expected expiry")
+
+
+def test_image_store_masks_are_read_only() -> None:
+    store = ImageStore(ttl_seconds=60)
+    image_id = store.put(PHOTO)
+    (mask_id,) = store.add_masks(image_id, [ALPHA])
+    masks = store.get(image_id).masks
+    assert mask_id in masks
+    try:
+        masks["new"] = ALPHA  # type: ignore[index]
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("masks mapping should be immutable")
