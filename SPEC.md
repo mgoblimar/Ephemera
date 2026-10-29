@@ -242,7 +242,8 @@ The Style Profile is shown to the user (editable chips), and they can toggle it 
   - The model usually makes **3–4 `search_archive` calls in parallel** in one turn, using different phrasings of the theme. **Every tool call must get its own tool response, or the next request fails with HTTP 400.** The proxy should also merge and dedupe results across those calls.
   - Latency was 3–5 s for the first turn and 6–15 s for the turn after the tool results, so about 10–20 s per plan. That's on target, with no room to spare.
   - Prompt caching works automatically: 500 of 567 prompt tokens were served from cache on repeat calls.
-  - Each check run used about 2–3k tokens, under $0.01.
+  - Each check run cost about **$0.01–0.03**, not "under $0.01" as first estimated. **Reasoning tokens are billed as output ($20/1M)**, and they were 40–85% of each run's output (80–978 per turn). Five runs used about $0.07–0.13.
+  - Budget rule: a Muse Wonder call costs roughly **$0.02 per turn**, so a 2-turn plan is about $0.05. Develop the agent against `muse-spark-1.3` (output is ~5× cheaper) or mocks, and switch to Muse Wonder only for final tests and the demo.
 - Not needed for this app: the docs' coding-agent, agent-framework (Claude Agent SDK, Codex app-server) and computer-use guides. Those drive a terminal or a screen; our agent only calls two of our own functions.
 
 **SAM 3.1: how it actually works**
