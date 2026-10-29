@@ -124,6 +124,17 @@ def test_real_providers_without_key_fail_fast() -> None:
     try:
         create_app(make_settings(use_real_providers=True, meta_api_key=None))
     except RuntimeError as exc:
-        assert "META_API_KEY" in str(exc)
+        assert "MODEL_API_KEY" in str(exc)
     else:
         raise AssertionError("expected startup to fail")
+
+
+def test_api_key_accepts_both_env_var_names(monkeypatch) -> None:  # noqa: ANN001
+    from app.config import Settings
+
+    monkeypatch.delenv("META_API_KEY", raising=False)
+    monkeypatch.setenv("MODEL_API_KEY", "from-model")
+    assert Settings(_env_file=None).meta_api_key == "from-model"
+    monkeypatch.delenv("MODEL_API_KEY")
+    monkeypatch.setenv("META_API_KEY", "from-meta")
+    assert Settings(_env_file=None).meta_api_key == "from-meta"

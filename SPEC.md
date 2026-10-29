@@ -55,7 +55,10 @@ With 7 days left, the scope is tiered so that each tier is demoable on its own.
 
 **Flow**
 1. The user takes a photo or picks one from the gallery. Hint shown: "Lay items flat on a contrasting surface."
-2. The app uploads the image to the proxy, which calls **SAM 3.1 automatic mask generation**.
+2. The app uploads the image to the proxy, which auto-detects the items. SAM 3.1 has no "segment everything" mode, so the proxy detects in two steps:
+   - **Plan A (default):** Muse Spark looks at the photo and returns a box and a type label (ticket, receipt, botanical, tape, …) for each item. All boxes, up to 16, then go to SAM 3.1 as box prompts in **one** request. This gives masks plus labels for about $0.007 per photo.
+   - **Plan B (fallback if Spark's boxes are poor):** send several concept prompts (`"ticket"`, `"receipt"`, `"flower"`, `"washi tape"`, `"sticker"`, `"paper"`) to SAM in parallel, then merge overlapping masks. About $0.015 per photo.
+   - Pick between them on Day 2 by testing both on 3 real desk photos.
 3. The Review screen overlays every candidate mask, each with a checkbox. The user can:
    - **Keep or discard** each candidate.
    - **Tap** an uncovered area to add a new mask (point prompt).
@@ -212,28 +215,60 @@ The Style Profile is shown to the user (editable chips), and they can toggle it 
 - **The proxy is stateless with respect to user data.** The archive lives on the device. For agent calls, the app sends the relevant scrap summaries (IDs, tags, OCR text, palette, thumbnail URL or base64), so `search_archive` runs over the payload the client sends. P3 cloud sync would move this server-side.
 - **Images:** full-res scraps stay on the device; the proxy gets downscaled copies (max 1536 px) for analysis.
 
-### 5.1 Meta Model API (as researched 2026-10-29; confirm on Day 1)
+### 5.1 Meta Model API (from dev.meta.ai docs, read 2026-10-29)
 
-- **Endpoint:** `https://api.meta.ai/v1`, reported to be OpenAI-compatible (Chat Completions). The proxy can use the standard `openai` Python SDK with `base_url` pointed there, so no custom HTTP client is needed.
-- **Agent model:** `muse-wonder-1.0`. Not `muse-wonder-full-1.0`, which is only available in a Muse Code subscription and has no API.
-- **Tool calling is native** (`tools`, `tool_choice`, parallel tool calls), and so are structured output (`response_format` with a JSON schema) and streaming (`stream: true`).
-- **Agent loop:** send theme + tool schemas → model returns `tool_calls` → proxy runs `search_archive` / `generate_ephemera` → results go back as `tool` messages → repeat until the model returns the Blend Plan. The final layout step uses structured output, not a tool.
-- **Reasoning effort** is tunable (minimal → max). Use low/medium for planning to keep latency under the 20 s target.
-- **Budget:** $150 API credits per team. Reported pricing is about $4 / $20 per 1M input/output tokens. Reported limits are 3,000 requests and 4M tokens per minute.
-- **Muse Image pricing:** a flat **$0.01 per image returned**, the same at any `reasoning_strength` and with or without tool use. A request for `n` images costs `n` × $0.01. Images that fail or are removed by safety filtering aren't billed. Image generation is therefore not a budget concern (1,000 images = $10); Muse Wonder tokens are the main cost.
-- **Budget estimate (rough, at $4 / $20 per 1M tokens):**
+**Endpoints and auth**
+- OpenAI-compatible base: `https://api.meta.ai/v1`, with Chat Completions (`/v1/chat/completions`) and Responses (`/v1/responses`). An Anthropic-compatible Messages API is at `https://api.meta.ai`.
+- Auth: `Authorization: Bearer <key>`. The docs name the env var `MODEL_API_KEY`; the proxy accepts `MODEL_API_KEY` or `META_API_KEY`.
+- The proxy uses the standard `openai` Python SDK with `base_url` set, plus `meta-sam-parser` for SAM output.
 
-  | Call | Assumed tokens | Est. cost | Calls on $150 |
-  |---|---|---|---|
-  | Agent plan (~5 tool turns, 20-scrap archive resent each turn) | ~30k in / 3k out | ~$0.18 | ~800 |
-  | Agent build (layout step) | ~8k in / 1k out | ~$0.05 | ~3,000 |
-  | Enrichment per scrap (Muse Spark, if priced like Wonder) | ~2k in / 300 out | ~$0.015 | ~10,000 |
-  | Generated image | n/a | $0.01 | 15,000 |
+**Models**
 
-  A heavy week (100 full agent runs + 300 scraps enriched + 200 images) comes to about **$30**, well within $150.
-- **Cost controls:** develop against mock providers (real calls only behind an env flag); send scrap summaries, not images, to the agent; use low/medium reasoning effort; use prompt caching for the system prompt + tool schemas if the endpoint supports it; cache demo responses; log tokens per request.
-- **Not planned:** self-hosting or fine-tuning. Muse models are API-only, and switching the core AI away from Meta's models would weaken the hackathon pitch.
-- The model is listed as a preview, so the hackathon deployment may differ from the public docs.
+| Use in EphemeraAI | Model ID | Price | Rate limit (per team) |
+|---|---|---|---|
+| Theme Blend Agent | `muse-wonder-1.0` | $4.00 in / $0.20 cached in / $20.00 out per 1M tokens | 3,000 RPM, 4M TPM |
+| Enrichment (OCR, tags), object detection, prompts | `muse-spark-1.3` | $1.25 in / $0.15 cached in / $4.25 out per 1M tokens | 3,000 RPM, 4M TPM |
+| Generated ephemera | `muse-image-1.0` | $0.01 per returned image (failed or safety-filtered images aren't billed) | 150 RPM |
+| Cutouts | `sam-3.1` | $2.50 per 1,000 images ($0.0025 per request) | 3,000 RPM |
+
+- Context window is 1,048,576 tokens and the output limit is 131,072 tokens, for both Muse text models.
+- Don't use `muse-spark-*-contributor`: it's cheaper, but Meta may train on your content.
+
+**Agent loop (Muse Wonder)**
+- Tool calling is native on all three APIs. **Use the Responses API for the agent**, because it carries the model's reasoning across tool-call turns (`include: ["reasoning.encrypted_content"]`, or `previous_response_id`). The docs warn that Chat Completions drops reasoning between turns, which can make long tool loops erratic.
+- Loop: send theme + tool schemas → model returns tool calls → proxy runs `search_archive` / `generate_ephemera` → results go back → repeat until the model returns the Blend Plan. The final layout step uses structured output, not a tool.
+- Reasoning effort ranges from `none` to `max`. Use `low`/`medium` for planning to stay under the 20 s target.
+- Not needed for this app: the docs' coding-agent, agent-framework (Claude Agent SDK, Codex app-server) and computer-use guides. Those drive a terminal or a screen; our agent only calls two of our own functions.
+
+**SAM 3.1: how it actually works**
+- Called through `POST /v1/responses` with `model: "sam-3.1"`. The photo goes in an `input_image` part (a public URL or a base64 data URL), and the prompt goes in an `input_text` part.
+- **Prompt types:**
+  - *Concept:* one short noun phrase, such as `"ticket"`. Returns every matching instance.
+  - *Point/box:* special tokens, e.g. `<0f>1<|point;x=..;y=..;w=..;h=..|>`, with a leading `-` for a negative point. Up to **16 objects per request**. Build these with `meta_sam_parser.build_object_prompt`, not by hand.
+- **There is no "segment everything" mode.** See the auto-detect plan in 4.1.
+- **Output:** streamed text lines. Each object is a box (`x1,y1,x2,y2` in source pixels) followed by a mask encoded as `data=<H>,<W>,<marker><base85 payload>`.
+  - **Masks are binary (0/1)**, and the mask raster is **smaller than the photo**, so the proxy upsamples it to photo size before feathering.
+  - Decode with `meta_sam_parser.decode_mask_to_raster` (`pip install meta-sam-parser`, version ≥ 0.1.0; pure Python, no dependencies).
+  - `metadata.include_confidence: "true"` (a string, not a boolean) adds a `c` score from 0 to 1. Zero matches is a normal, empty response.
+- Errors: a `400` is permanent (fix the input; don't retry); `404 model_not_found` means a wrong model ID or no access.
+- Not documented: image size limits and latency. Measure both on Day 2.
+
+**Budget estimate (at published prices)**
+
+| Call | Assumed size | Est. cost | Calls on $150 |
+|---|---|---|---|
+| Agent plan (Muse Wonder, ~5 tool turns) | ~30k in / 3k out | ~$0.18 | ~800 |
+| Agent build (layout step, Muse Wonder) | ~8k in / 1k out | ~$0.05 | ~3,000 |
+| Enrichment per scrap (Muse Spark) | ~2k in / 300 out | ~$0.004 | ~37,000 |
+| Auto-detect a photo (Muse Spark boxes + one SAM request) | ~2k in / 500 out + 1 image | ~$0.007 | ~21,000 |
+| Tap-to-add (one SAM request) | 1 image | $0.0025 | 60,000 |
+| Generated image (Muse Image) | n/a | $0.01 | 15,000 |
+
+A heavy week of 100 agent runs, 150 photos, 300 taps, 300 enrichments and 200 images comes to about **$28**. Muse Wonder is ~80% of that.
+
+- **Cost controls:** develop against mock providers (real calls only behind an env flag); send scrap summaries, not images, to the agent; use low/medium reasoning effort; cached input is 20× cheaper, so keep the system prompt + tool schemas identical across calls; cache demo responses; log tokens per request.
+- **Not planned:** self-hosting or fine-tuning. Muse Wonder is API-only (an open-weight "Muse Spark Open" exists but isn't needed), and switching the core AI away from Meta's hosted models would weaken the hackathon pitch.
+- Confirm on Day 1 that the hackathon key can reach all four model IDs.
 
 ### 5.2 API Contract (sketch)
 
@@ -318,8 +353,10 @@ Solo build: features are built **vertically** (app screen + its proxy endpoint t
 
 ## 10. Open Questions
 
-- **SAM cutout edges:** does SAM 3.1 give each pixel a yes/no "inside the object" answer (hard edges), or a 0–100% value (soft edges)? Soft edges let washi tape stay semi-see-through. With hard edges, the proxy fakes it by feathering the border. (The cut styles in 4.1 work either way.)
+- ~~**SAM cutout edges:** hard or soft?~~ **Resolved:** binary (hard) masks at a lower resolution than the photo. The proxy upsamples and feathers them. Washi tape won't keep real translucency in the MVP.
+- **Auto-detect:** does Plan A (Muse Spark boxes → SAM box prompts) find scraps reliably on real desk photos, or do we need Plan B? Test on Day 2.
+- SAM image size limit and latency (not documented).
 - ~~**Muse Wonder and tools:** native tool calling or a JSON fallback?~~ **Resolved:** native tool calling is supported (see 5.1), so no JSON fallback is needed. Still to do: one live test call with the hackathon key on Day 1.
 - ~~Muse Image pricing?~~ **Resolved:** $0.01 per returned image (see 5.1).
-- Muse Spark model ID and whether it shares the same endpoint and credits.
+- ~~Muse Spark model ID?~~ **Resolved:** `muse-spark-1.3`, same endpoint and key (see 5.1).
 - Whether the Style Profile should also bias manual editing (e.g. a "tilt like me" auto-rotation) or only the agent.

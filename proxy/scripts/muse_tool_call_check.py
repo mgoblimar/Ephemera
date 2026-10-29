@@ -1,6 +1,6 @@
 """Day 1 check: does the hackathon key serve muse-wonder-1.0 with native tool calling?
 
-Run from the proxy folder with META_API_KEY in proxy/.env:
+Run from the proxy folder with MODEL_API_KEY in proxy/.env:
     .venv/Scripts/python scripts/muse_tool_call_check.py
 
 Makes two small requests (well under $0.01 of tokens) and prints a PASS/FAIL report.
@@ -42,7 +42,7 @@ FAKE_RESULTS = [
 def main() -> int:
     settings = Settings()
     if not settings.meta_api_key:
-        print("FAIL: META_API_KEY is not set. Add it to proxy/.env (see .env.example).")
+        print("FAIL: MODEL_API_KEY is not set. Add it to proxy/.env (see .env.example).")
         return 1
 
     client = OpenAI(api_key=settings.meta_api_key, base_url=settings.meta_api_base_url)

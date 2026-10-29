@@ -23,7 +23,7 @@ Tests: `.venv/Scripts/python -m pytest`
 
 ### Check Muse Wonder tool calling (Day 1)
 
-Put your key in `proxy/.env` as `META_API_KEY=...`, then:
+Put your key in `proxy/.env` as `MODEL_API_KEY=...` (`META_API_KEY` also works), then:
 
 ```bash
 .venv/Scripts/python scripts/muse_tool_call_check.py
