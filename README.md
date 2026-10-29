@@ -21,7 +21,9 @@ cp .env.example .env                                           # keep USE_REAL_P
 
 Tests: `.venv/Scripts/python -m pytest`
 
-### Check Muse Wonder tool calling (Day 1)
+### Check agent tool calling
+
+Checks whichever `AGENT_MODEL` is set in `proxy/.env` (see `.env.example` for the cheap testing profile vs the demo profile).
 
 Put your key in `proxy/.env` as `MODEL_API_KEY=...` (`META_API_KEY` also works), then:
 

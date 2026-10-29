@@ -234,6 +234,35 @@ The Style Profile is shown to the user (editable chips), and they can toggle it 
 - Context window is 1,048,576 tokens and the output limit is 131,072 tokens, for both Muse text models.
 - Don't use `muse-spark-*-contributor`: it's cheaper, but Meta may train on your content.
 
+**Which model does what**
+
+Each job has its own setting in `proxy/.env`, so models can be swapped without code changes.
+
+| App feature (spec section) | Model | Setting | Testing profile | When it runs |
+|---|---|---|---|---|
+| Auto-detect items in a photo, step 1: boxes + type labels (4.1) | Muse Spark 1.3 (vision) | `VISION_MODEL` | contributor | Once per captured photo |
+| Auto-detect, step 2: cut out every detected item (4.1) | SAM 3.1, box prompts | `SAM_MODEL` | standard | Once per photo (up to 16 items) |
+| Tap to add a missed item / refine a cutout (4.1) | SAM 3.1, point prompts | `SAM_MODEL` | standard | Each tap |
+| OCR, tags, mood, description for each scrap (4.3) | Muse Spark 1.3 (vision) | `VISION_MODEL` | contributor | Once per saved scrap, in the background |
+| Journal prompts & captions (4.3) | Muse Spark 1.3 (text) | `VISION_MODEL` | contributor | On request |
+| Theme Blend Agent: plan, calls `search_archive` / `generate_ephemera` (4.6) | Muse Wonder 1.0 | `AGENT_MODEL` | contributor (Spark) | Each "Plan" tap |
+| Theme Blend Agent: layout placements, structured output (4.6) | Muse Wonder 1.0 | `AGENT_MODEL` | contributor (Spark) | Each "Build" tap |
+| `generate_ephemera`: stamps, tape, labels (4.6) | Muse Image 1.0 | `IMAGE_MODEL` | standard | Up to 4 per build |
+| Cut out generated ephemera (4.6) | SAM 3.1, concept prompt (e.g. `"stamp"`) | `SAM_MODEL` | standard | Once per generated image |
+| Style Profile from imported journal pages (4.7, stretch) | Muse Spark 1.3 (vision, multi-image) | `VISION_MODEL` | contributor | Once per import |
+
+No model is used for:
+- cut styles (tight, sticker, margin)
+- palettes (local k-means)
+- `search_archive` itself (runs in the proxy over the scrap summaries the app sends)
+- the canvas, the book and archive filters
+
+**Profiles**
+- **Testing:** `AGENT_MODEL` and `VISION_MODEL` set to `muse-spark-1.3-contributor`, about 70× cheaper than Muse Wonder. Meta may train on what's sent, so use only test photos you're fine sharing. Also check on the first real call that contributor mode accepts images.
+- **Demo / real users:** `AGENT_MODEL=muse-wonder-1.0` and `VISION_MODEL=muse-spark-1.3`. These keep the privacy promise in section 6, and the pitch is "built on Muse Wonder".
+- SAM and Muse Image have no contributor mode and are already cheap.
+- Before recording the video, re-test the agent on Muse Wonder: prompts tuned on Spark may behave differently.
+
 **Agent loop (Muse Wonder)**
 - Tool calling is native on all three APIs. **Use the Responses API for the agent**, because it carries the model's reasoning across tool-call turns (`include: ["reasoning.encrypted_content"]`, or `previous_response_id`). The docs warn that Chat Completions drops reasoning between turns, which can make long tool loops erratic.
 - Loop: send theme + tool schemas → model returns tool calls → proxy runs `search_archive` / `generate_ephemera` → results go back → repeat until the model returns the Blend Plan. The final layout step uses structured output, not a tool.

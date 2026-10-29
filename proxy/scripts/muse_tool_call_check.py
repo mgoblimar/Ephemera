@@ -1,9 +1,10 @@
-"""Day 1 check: does the hackathon key serve muse-wonder-1.0 with native tool calling?
+"""Check that the configured AGENT_MODEL (muse-wonder-1.0 by default) does native tool calling.
 
 Run from the proxy folder with MODEL_API_KEY in proxy/.env:
     .venv/Scripts/python scripts/muse_tool_call_check.py
 
-Makes two small requests (well under $0.01 of tokens) and prints a PASS/FAIL report.
+Makes two small requests and prints a PASS/FAIL report. Cost per run: about $0.01-0.03
+on muse-wonder-1.0 (reasoning tokens bill as output), far less on muse-spark-1.3-contributor.
 """
 
 import json
@@ -46,7 +47,7 @@ def main() -> int:
         return 1
 
     client = OpenAI(api_key=settings.meta_api_key, base_url=settings.meta_api_base_url)
-    model = settings.muse_wonder_model
+    model = settings.agent_model
     messages: list[dict] = [
         {"role": "system", "content": "You design junk-journal pages. Use the tools to find scraps before answering."},
         {"role": "user", "content": "Find scraps for the theme 'slow Sunday café morning, warm browns'."},
