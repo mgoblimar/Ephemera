@@ -157,7 +157,7 @@ The headline agentic feature: it composes a themed page from the archive and gen
 Layout is not a tool. It is a final structured-output step: Muse Wonder receives the scrap sizes plus the plan and returns `[{scrap_id, x, y, scale, rotation, z}]` in normalized page coordinates. The app clamps and validates the result.
 
 **Guardrails**
-- At most 8 tool calls per plan (token cost and latency) and at most 4 generations per build (latency; images cost only $0.01 each). Each `generate_ephemera` call may request `n=2` variants so the user can pick one in the plan cards.
+- At most 8 tool calls per plan, counting each parallel call separately (token cost and latency) and at most 4 generations per build (latency; images cost only $0.01 each). Each `generate_ephemera` call may request `n=2` variants so the user can pick one in the plan cards.
 - The agent only references scrap IDs returned by `search_archive`; unknown IDs are dropped.
 - If the archive has fewer than 3 relevant scraps, the plan says so and leans on generation.
 - Progress is streamed to the UI ("Searching archive… Found 7 botanicals… Planning layout…").
@@ -238,6 +238,11 @@ The Style Profile is shown to the user (editable chips), and they can toggle it 
 - Tool calling is native on all three APIs. **Use the Responses API for the agent**, because it carries the model's reasoning across tool-call turns (`include: ["reasoning.encrypted_content"]`, or `previous_response_id`). The docs warn that Chat Completions drops reasoning between turns, which can make long tool loops erratic.
 - Loop: send theme + tool schemas → model returns tool calls → proxy runs `search_archive` / `generate_ephemera` → results go back → repeat until the model returns the Blend Plan. The final layout step uses structured output, not a tool.
 - Reasoning effort ranges from `none` to `max`. Use `low`/`medium` for planning to stay under the 20 s target.
+- **Measured on Day 1 (default effort, 4 live runs):**
+  - The model usually makes **3–4 `search_archive` calls in parallel** in one turn, using different phrasings of the theme. **Every tool call must get its own tool response, or the next request fails with HTTP 400.** The proxy should also merge and dedupe results across those calls.
+  - Latency was 3–5 s for the first turn and 6–15 s for the turn after the tool results, so about 10–20 s per plan. That's on target, with no room to spare.
+  - Prompt caching works automatically: 500 of 567 prompt tokens were served from cache on repeat calls.
+  - Each check run used about 2–3k tokens, under $0.01.
 - Not needed for this app: the docs' coding-agent, agent-framework (Claude Agent SDK, Codex app-server) and computer-use guides. Those drive a terminal or a screen; our agent only calls two of our own functions.
 
 **SAM 3.1: how it actually works**

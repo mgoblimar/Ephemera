@@ -67,10 +67,11 @@ def main() -> int:
         print(reply.content)
         return 1
 
-    call = reply.tool_calls[0]
-    print(f"[1] tool call: {call.function.name}({call.function.arguments})")
+    # The model may make several calls at once (parallel tool calls); every one needs a reply.
     messages.append(reply.model_dump(exclude_none=True))
-    messages.append({"role": "tool", "tool_call_id": call.id, "content": json.dumps(FAKE_RESULTS)})
+    for call in reply.tool_calls:
+        print(f"[1] tool call: {call.function.name}({call.function.arguments})")
+        messages.append({"role": "tool", "tool_call_id": call.id, "content": json.dumps(FAKE_RESULTS)})
 
     try:
         started = time.perf_counter()
