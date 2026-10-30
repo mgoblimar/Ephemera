@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ Future<void> showScrapDetail(
   Scrap scrap, {
   VoidCallback? onRemove,
   ValueChanged<PhysicalStatus>? onStatus,
+  ValueChanged<String>? onUsedIn,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -26,6 +28,7 @@ Future<void> showScrapDetail(
         controller: controller,
         onRemove: onRemove,
         onStatus: onStatus,
+        onUsedIn: onUsedIn,
       ),
     ),
   );
@@ -37,12 +40,14 @@ class _ScrapDetail extends StatelessWidget {
     required this.controller,
     this.onRemove,
     this.onStatus,
+    this.onUsedIn,
   });
 
   final Scrap scrap;
   final ScrollController controller;
   final VoidCallback? onRemove;
   final ValueChanged<PhysicalStatus>? onStatus;
+  final ValueChanged<String>? onUsedIn;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +77,12 @@ class _ScrapDetail extends StatelessWidget {
         ),
         if (onStatus != null) ...[
           const SizedBox(height: 16),
-          _StatusPicker(initial: scrap.physicalStatus, onChanged: onStatus!),
+          _StatusPicker(
+            initial: scrap.physicalStatus,
+            initialNote: scrap.usedIn,
+            onChanged: onStatus!,
+            onNote: onUsedIn,
+          ),
         ],
         if (scrap.tooWeakForAgent) ...[
           const SizedBox(height: 8),
@@ -177,17 +187,49 @@ class _ScrapDetail extends StatelessWidget {
 
 /// Where the real scrap is now. Theme Blend skips used and set-aside scraps.
 class _StatusPicker extends StatefulWidget {
-  const _StatusPicker({required this.initial, required this.onChanged});
+  const _StatusPicker({
+    required this.initial,
+    required this.onChanged,
+    this.initialNote = '',
+    this.onNote,
+  });
 
   final PhysicalStatus initial;
   final ValueChanged<PhysicalStatus> onChanged;
+  final String initialNote;
+
+  /// Saves the used-in note; null hides the field.
+  final ValueChanged<String>? onNote;
 
   @override
   State<_StatusPicker> createState() => _StatusPickerState();
 }
 
 class _StatusPickerState extends State<_StatusPicker> {
+  static const _saveDelay = Duration(milliseconds: 600);
+
   late PhysicalStatus _status = widget.initial;
+  late final _note = TextEditingController(text: widget.initialNote);
+  Timer? _pendingSave;
+
+  /// Saves shortly after typing stops, and on close if still pending.
+  void _noteChanged(String _) {
+    _pendingSave?.cancel();
+    _pendingSave = Timer(_saveDelay, _saveNote);
+  }
+
+  void _saveNote() {
+    _pendingSave?.cancel();
+    _pendingSave = null;
+    widget.onNote?.call(_note.text.trim());
+  }
+
+  @override
+  void dispose() {
+    if (_pendingSave != null) _saveNote();
+    _note.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -214,6 +256,24 @@ class _StatusPickerState extends State<_StatusPicker> {
               : 'Theme Blend will leave it out.',
           style: TextStyle(color: tokens.inkSoft, fontSize: 13),
         ),
+        if (widget.onNote != null && _status != PhysicalStatus.available) ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: _note,
+            onChanged: _noteChanged,
+            onSubmitted: (_) => _saveNote(),
+            textInputAction: TextInputAction.done,
+            maxLength: 80,
+            decoration: InputDecoration(
+              labelText: _status == PhysicalStatus.used
+                  ? 'Used in'
+                  : 'Set aside for',
+              hintText: 'Kyoto journal, page 4',
+              prefixIcon: const Icon(Icons.bookmark_border),
+              isDense: true,
+            ),
+          ),
+        ],
       ],
     );
   }

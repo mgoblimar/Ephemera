@@ -239,4 +239,47 @@ void main() {
       expect(find.bySemanticsLabel('ticket scrap'), findsOneWidget);
     },
   );
+
+  testWidgets('the used-in note is saved and found by search', (tester) async {
+    final archive = _MemoryArchive(_archive);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          scrapRepositoryProvider.overrideWith((ref) async => archive),
+          scrapsProvider.overrideWith(
+            (ref) async =>
+                (await ref.watch(scrapRepositoryProvider.future)).getAll(),
+          ),
+        ],
+        child: MaterialApp(theme: buildTheme(), home: const ArchiveScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('ticket scrap'));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(ListView).last;
+    await tester.dragUntilVisible(
+      find.text('Used in a spread'),
+      sheet,
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Used in a spread'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Used in'),
+      'Kyoto journal, page 4',
+    );
+    await tester.pump(const Duration(seconds: 1)); // saves after typing stops
+    await tester.tapAt(const Offset(10, 10)); // close the sheet
+    await tester.pumpAndSettle();
+
+    expect(
+      (await archive.getAll()).firstWhere((s) => s.id == 't').usedIn,
+      'Kyoto journal, page 4',
+    );
+    await tester.enterText(find.byType(TextField).first, 'kyoto');
+    await tester.pumpAndSettle();
+    expect(find.byType(ScrapCard), findsOneWidget);
+  });
 }

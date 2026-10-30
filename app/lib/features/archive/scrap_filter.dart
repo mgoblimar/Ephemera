@@ -22,7 +22,7 @@ class ScrapFilter {
 
   static const none = ScrapFilter();
 
-  /// Free text over OCR text, description, tags and type.
+  /// Free text over OCR text, description, tags, type, mood and the used-in note.
   final String query;
   final Set<String> types;
   final Set<String> moods;
@@ -122,7 +122,7 @@ List<Scrap> applyFilter(
       if (target != null && !_hasColor(s, target)) return false;
       if (words.isNotEmpty) {
         final haystack = _words(
-          '${s.ocrText} ${s.description} ${s.tags.join(' ')} ${s.type} ${s.mood.join(' ')}',
+          '${s.ocrText} ${s.description} ${s.tags.join(' ')} ${s.type} ${s.mood.join(' ')} ${s.usedIn}',
         );
         if (!words.every(haystack.contains)) return false;
       }

@@ -47,6 +47,7 @@ With 7 days left, the scope is tiered so that each tier is demoable on its own.
 | Post-hackathon | Journal import: re-extract scraps + read-only digital copy | Kept in the spec (4.7) as the roadmap |
 | Post-hackathon | Cloud sync + accounts | |
 | Post-hackathon | Aging filters, agent recolor/tint | |
+| Post-hackathon (experiment) | **Fine-tuned SAM 3 scrap finder** (8.1) | Uses the Modal / Baseten credits |
 
 **Cut line:** by the end of **Day 3** the hero flow (P0) must work end-to-end on a real device. If it doesn't, P2 and Stretch are dropped and Days 4–5 go to P0 polish plus the agent with `search_archive` only. Generated ephemera is the first P1/P2 item cut; the import is the stretch goal and starts only after the agent builds pages end-to-end.
 
@@ -155,7 +156,7 @@ A grid of every scrap ("scrapbook wall" in 4.8), with **filters that combine**: 
 | **Colour** (tap a swatch) | `palette` | Data ready |
 | **Split from** (e.g. "elements of the Sumo wrapper") | **new:** `split_from`: parent piece's label + capture, set when a Split element is cut | Needs a small data change |
 | **Date added** (today, this week, a date range) | `created_at` | Data ready |
-| **Availability** (unused / already used in a physical spread) | `physical_status`: Not used yet / Used in a spread / Set aside, set in the scrap sheet; Theme Blend only gets "Not used yet" scraps (`used_in` note not built) | ✅ Built Oct 30 |
+| **Availability** (unused / already used in a physical spread) | `physical_status`: Not used yet / Used in a spread / Set aside, set in the scrap sheet; Theme Blend only gets "Not used yet" scraps; a `used_in` note ("Kyoto journal, page 4") is searchable | ✅ Built Oct 30–31 |
 
 **Next iteration: "physically used" tracking.** Journalers glue real scraps into real spreads, and then those scraps aren't available anymore.
 - Each scrap gets a status: `available` · `used` (glued into a physical spread) · optionally `reserved` (set aside for a planned spread). There's an optional note or link to which spread.
@@ -501,6 +502,19 @@ Solo build: features are built **vertically** (app screen + its proxy endpoint t
 | **7** | **Submission & social:** submit the repo + video, post on social media (cut a 30–60 s vertical clip from the video) | Submitted |
 
 **Daily rule:** commit at the end of each day with the hero flow still working, so there's always a demoable build.
+
+### 8.1 Plan: fine-tune SAM 3 to find scraps (after the demo, or Day 6+ only if eval clearly wins)
+
+Why: Spark's boxes vary run to run (one ~28 px step off, sometimes loose into shadows), and the hosted Spark 1.3 / SAM 3.1 can't be fine-tuned. Meta's open-weight **SAM 3** finds every instance of a concept from a text prompt; tuned on "journal scrap" it would find and cut every piece in one call, replacing Spark boxes in the scan step (Spark keeps labelling and enrichment).
+
+1. **Access:** request `facebook/sam3` on Hugging Face (gated); read token in `proxy/.env` (user adds it). Install Modal and log in (`pip install modal`, `modal token new`).
+2. **Synthetic data, no hand-labelling:** paste the archive's clean cut-outs (alpha PNGs) onto real desk / mat / table photos at random positions, angles, scales and overlaps, with soft shadows and lighting jitter. Every mask and box is known exactly. Target ~5k images; hold out real tablet scans (`proxy/test_photos/eval`) for testing only.
+3. **Train on Modal:** fine-tune SAM 3's detector head (or LoRA) for the concept "journal scrap" on one A100 for a few hours (credits). Track mask IoU / box recall on the held-out real scans.
+4. **Serve:** a Modal or Baseten endpoint (`/find_scraps` → boxes + masks). New proxy strategy `AUTO_DETECT_STRATEGY=sam3_tuned` beside Plan A, so it can be switched off.
+5. **Decide with `scripts/scan_eval.py`:** adopt only if it beats Spark boxes on the real eval set (shape score, pieces found, no rough cuts). Otherwise it stays a roadmap slide.
+6. **Later, real data:** log (opt-in) what users keep, untick, remove and re-split as labelled examples, and retrain.
+
+Fireworks credits: better kept for hosted LLM work (e.g. a cheaper caption / prompt model), not this.
 
 ## 9. Risks & Mitigations
 

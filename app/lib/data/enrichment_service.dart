@@ -26,7 +26,7 @@ class EnrichmentService {
 
   bool _running = false;
 
-  /// Enriches every scrap not yet enriched. Safe to call often: a run already
+  /// Enriches every scrap not yet read (or read before the latest fields). Safe to call often: a run already
   /// in progress is not duplicated. Returns how many scraps were enriched.
   Future<int> enrichPending() async {
     if (_running) return 0;
@@ -37,7 +37,7 @@ class EnrichmentService {
       try {
         repository = await _repository();
         pending = (await repository.getAll())
-            .where((s) => !s.enriched)
+            .where((s) => s.needsReading)
             .toList();
       } on Exception {
         return 0; // storage unavailable; nothing to do this run
@@ -93,5 +93,6 @@ Scrap applyEnrichment(Scrap scrap, Map<String, dynamic> data) {
       ),
     ),
     enriched: true,
+    readVersion: currentReadVersion,
   );
 }

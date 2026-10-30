@@ -7,6 +7,10 @@ const minAgentSide = 48;
 const minAgentElementArea = 120 * 120;
 const maxAgentElementStretch = 4.0;
 
+/// What Muse Spark's reading of a scrap includes; bump when it gains fields so
+/// older scraps are read once more. 2 = journal prompt + caption ideas.
+const currentReadVersion = 2;
+
 enum ScrapSource {
   capture('Scanned'),
   imported('Imported'),
@@ -50,6 +54,8 @@ class Scrap {
     this.physicalStatus = PhysicalStatus.available,
     this.journalPrompt = '',
     this.captions = const [],
+    this.readVersion = 0,
+    this.usedIn = '',
   });
 
   final String id;
@@ -83,6 +89,17 @@ class Scrap {
   /// From enrichment: short caption ideas for a page.
   final List<String> captions;
 
+  /// [currentReadVersion] when last enriched; older scraps are read again once.
+  final int readVersion;
+
+  /// Where the physical scrap went, e.g. "Kyoto journal, p. 4" (SPEC 4.2).
+  final String usedIn;
+
+  /// Needs (another) Muse Spark reading. AI-made decorations already carry their prompt.
+  bool get needsReading =>
+      !enriched ||
+      (source != ScrapSource.generated && readVersion < currentReadVersion);
+
   bool get isSplitElement => splitFromLabel != null;
 
   /// Too small or thin to look good on a page (side text, specks of a badge),
@@ -108,6 +125,8 @@ class Scrap {
     PhysicalStatus? physicalStatus,
     String? journalPrompt,
     List<String>? captions,
+    int? readVersion,
+    String? usedIn,
   }) {
     return Scrap(
       id: id,
@@ -130,6 +149,8 @@ class Scrap {
       physicalStatus: physicalStatus ?? this.physicalStatus,
       journalPrompt: journalPrompt ?? this.journalPrompt,
       captions: captions ?? this.captions,
+      readVersion: readVersion ?? this.readVersion,
+      usedIn: usedIn ?? this.usedIn,
     );
   }
 
@@ -154,6 +175,8 @@ class Scrap {
     'physical_status': physicalStatus.name,
     'journal_prompt': journalPrompt,
     'captions': captions,
+    'read_version': readVersion,
+    'used_in': usedIn,
   };
 
   factory Scrap.fromJson(Map<String, dynamic> json) {
@@ -184,6 +207,11 @@ class Scrap {
           PhysicalStatus.available,
       journalPrompt: json['journal_prompt'] as String? ?? '',
       captions: _strings(json['captions']),
+      // Older files: an enriched scrap without a version was read as version 1.
+      readVersion:
+          json['read_version'] as int? ??
+          ((json['enriched'] as bool? ?? false) ? 1 : 0),
+      usedIn: json['used_in'] as String? ?? '',
     );
   }
 }

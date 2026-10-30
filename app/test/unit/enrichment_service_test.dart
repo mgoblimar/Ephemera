@@ -138,4 +138,32 @@ void main() {
     expect(reloaded.journalPrompt, scrap.journalPrompt);
     expect(reloaded.captions, scrap.captions);
   });
+
+  test(
+    'scraps read before prompts existed are read once more, then left',
+    () async {
+      final saved = await repository.saveCapture(
+        photoJpeg: Uint8List(1),
+        cutouts: [_cutout('a')],
+      );
+      // As saved by an older app: enriched, no read version.
+      final old = saved.single.toJson()
+        ..['enriched'] = true
+        ..remove('read_version');
+      await repository.update(Scrap.fromJson(old));
+      var calls = 0;
+      final client = fakeProxy((_) {
+        calls++;
+        return okEnvelope({'type': 'ticket', 'journal_prompt': 'Where to?'});
+      });
+
+      await service(client).enrichPending();
+      await service(client).enrichPending();
+
+      expect(calls, 1);
+      final scrap = (await repository.getAll()).single;
+      expect(scrap.journalPrompt, 'Where to?');
+      expect(scrap.needsReading, isFalse);
+    },
+  );
 }

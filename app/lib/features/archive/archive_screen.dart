@@ -98,6 +98,7 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
                       s,
                       onRemove: () => _remove(s),
                       onStatus: (status) => _setStatus(s, status),
+                      onUsedIn: (note) => _setUsedIn(s, note),
                     ),
                   ),
                 ),
@@ -112,6 +113,12 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
       scrap.id,
       (s) => s.copyWith(physicalStatus: status),
     );
+    ref.invalidate(scrapsProvider);
+  }
+
+  Future<void> _setUsedIn(Scrap scrap, String note) async {
+    final repository = await ref.read(scrapRepositoryProvider.future);
+    await repository.modify(scrap.id, (s) => s.copyWith(usedIn: note));
     ref.invalidate(scrapsProvider);
   }
 
