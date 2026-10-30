@@ -187,9 +187,12 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
     var saved = 0;
     for (final photo in _photos) {
       final imageId = photo.scan?.imageId;
+      final pieces = {
+        for (final p in photo.scan?.pieces ?? const <ScanPiece>[]) p.id: p,
+      };
       final cutouts = [
         for (final s in result.scraps)
-          if (s.imageId == imageId) s.scrap,
+          if (s.imageId == imageId) _withOrigin(s.scrap, pieces),
       ];
       if (cutouts.isEmpty) continue;
       final scraps = await repository.saveCapture(
@@ -202,6 +205,16 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
     // Read the new scraps' text and tags in the background (~₱0.01 each).
     unawaited(ref.read(enrichmentServiceProvider).enrichPending());
     return saved;
+  }
+
+  /// Records which whole piece a Split element came from (for archive filters).
+  CutoutScrap _withOrigin(CutoutScrap scrap, Map<String, ScanPiece> pieces) {
+    final parentId = pieces[scrap.maskId]?.parentId;
+    if (parentId == null) return scrap;
+    return scrap.withOrigin(
+      parentPieceId: parentId,
+      parentLabel: pieces[parentId]?.label,
+    );
   }
 
   void _showMessage(String message) {

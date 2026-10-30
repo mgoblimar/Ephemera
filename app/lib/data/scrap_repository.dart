@@ -75,9 +75,11 @@ class FileScrapRepository implements ScrapRepository {
     final photoPath = p.join(_captureDir.path, '$captureId.jpg');
     await File(photoPath).writeAsBytes(photoJpeg, flush: true);
 
+    // Ids first, so a Split element can link to its parent saved in this batch.
+    final ids = {for (final c in cutouts) c.maskId: _uuid.v4()};
     final scraps = <Scrap>[];
     for (final cutout in cutouts) {
-      final id = _uuid.v4();
+      final id = ids[cutout.maskId]!;
       final pngPath = p.join(_scrapDir.path, '$id.png');
       await File(pngPath).writeAsBytes(cutout.png, flush: true);
       scraps.add(
@@ -91,6 +93,10 @@ class FileScrapRepository implements ScrapRepository {
           captureId: captureId,
           palette: cutout.palette,
           type: cutout.label ?? 'other',
+          splitFromLabel: cutout.parentPieceId == null
+              ? null
+              : (cutout.parentLabel ?? 'other'),
+          parentScrapId: ids[cutout.parentPieceId],
         ),
       );
     }

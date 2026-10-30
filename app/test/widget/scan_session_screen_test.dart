@@ -159,6 +159,25 @@ void main() {
     expect((jsonDecode(split.body) as Map)['piece_id'], 'p0');
   });
 
+  testWidgets('saved split elements are linked to their parent', (
+    tester,
+  ) async {
+    final repository = FileScrapRepository(root);
+    await tester.pumpWidget(_app(_proxy([]), repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Split').first);
+    await tester.pumpAndSettle();
+
+    final saved = await _cutAndWait(tester, 'Cut & save 4', repository, 4);
+
+    final elements = saved.where((s) => s.isSplitElement).toList();
+    expect(elements, hasLength(2));
+    expect(elements.every((s) => s.splitFromLabel == 'sticker'), isTrue);
+    final parentIds = elements.map((s) => s.parentScrapId).toSet();
+    expect(parentIds, hasLength(1));
+    expect(saved.map((s) => s.id), contains(parentIds.single));
+  });
+
   testWidgets('a failed scan shows the error with retry', (tester) async {
     final client = fakeProxy(
       (_) => {

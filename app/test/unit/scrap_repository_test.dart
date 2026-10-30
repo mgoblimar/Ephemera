@@ -67,6 +67,36 @@ void main() {
     expect((await FileScrapRepository(root).getAll()).single.type, 'sticker');
   });
 
+  test('split elements remember their parent piece', () async {
+    final repository = FileScrapRepository(root);
+
+    final saved = await repository.saveCapture(
+      photoJpeg: Uint8List(1),
+      cutouts: [
+        _cutout('whole').withLabel('wrapper'),
+        _cutout('logo').withOrigin(
+          label: 'logo',
+          parentPieceId: 'whole',
+          parentLabel: 'wrapper',
+        ),
+        _cutout('orphan').withOrigin(
+          label: 'lettering',
+          parentPieceId: 'not-cut',
+          parentLabel: 'box',
+        ),
+      ],
+    );
+
+    final reloaded = {
+      for (final s in await FileScrapRepository(root).getAll()) s.type: s,
+    };
+    expect(reloaded['wrapper']!.isSplitElement, isFalse);
+    expect(reloaded['logo']!.splitFromLabel, 'wrapper');
+    expect(reloaded['logo']!.parentScrapId, saved.first.id);
+    expect(reloaded['lettering']!.splitFromLabel, 'box');
+    expect(reloaded['lettering']!.parentScrapId, isNull); // parent wasn't cut
+  });
+
   test('getAll lists newest scraps first', () async {
     var now = DateTime.utc(2026, 10, 29, 9);
     final repository = FileScrapRepository(root, clock: () => now);

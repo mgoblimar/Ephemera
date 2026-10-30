@@ -70,6 +70,8 @@ class CutoutScrap {
     required this.height,
     required this.palette,
     this.label,
+    this.parentPieceId,
+    this.parentLabel,
   });
 
   final String maskId;
@@ -81,12 +83,25 @@ class CutoutScrap {
   /// Scrap type carried over from the mask it was cut from.
   final String? label;
 
-  CutoutScrap withLabel(String? label) => CutoutScrap(
+  /// For Split elements: the piece they were split from (same capture).
+  final String? parentPieceId;
+  final String? parentLabel;
+
+  CutoutScrap withLabel(String? label) => withOrigin(label: label);
+
+  /// Copy with type and split-from origin (nulls keep the current values).
+  CutoutScrap withOrigin({
+    String? label,
+    String? parentPieceId,
+    String? parentLabel,
+  }) => CutoutScrap(
     maskId: maskId,
     png: png,
     width: width,
     height: height,
     palette: palette,
-    label: label,
+    label: label ?? this.label,
+    parentPieceId: parentPieceId ?? this.parentPieceId,
+    parentLabel: parentLabel ?? this.parentLabel,
   );
 }

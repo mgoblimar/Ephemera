@@ -132,10 +132,29 @@ These are batched too, with all pending edits in one SAM request:
 
 ### 4.2 Scrap Archive (P0)
 
-- Grid of every scrap with filters: **type** (ticket, receipt, botanical, tape, paper, sticker, note, other), **tags**, **dominant color**, **date**, **source** (capture vs. imported journal vs. generated).
-- Text search over OCR text and tags (needs P1 enrichment; tags work without it).
-- Scrap detail view: image, OCR text, tags (editable), palette swatches, source photo.
-- Long-press to multi-select, then "Add to page" or "Blend with agent."
+A grid of every scrap ("scrapbook wall" in 4.8), with **filters that combine**: each filter narrows the result, and active filters show as removable chips.
+
+| Filter | Source of the data | Status |
+|---|---|---|
+| **Search text** (words on the scrap, description) | `ocr_text`, `description` (enrichment) | Data ready |
+| **Vibe / mood** (cozy, nostalgic, playful…) | `mood` (enrichment) | Data ready |
+| **Tags** (coffee, yellow, travel…) | `tags` (enrichment) | Data ready |
+| **Type** (ticket, wrapper, sticker, logo, lettering…) | `type` (detector / Split / enrichment) | Data ready |
+| **Colour** (tap a swatch) | `palette` | Data ready |
+| **Split from** (e.g. "elements of the Sumo wrapper") | **new:** `split_from`: parent piece's label + capture, set when a Split element is cut | Needs a small data change |
+| **Date added** (today, this week, a date range) | `created_at` | Data ready |
+| **Availability** (unused / already used in a physical spread) | **new (next iteration):** `physical_status` + `used_in` note | Planned |
+
+**Next iteration: "physically used" tracking.** Journalers glue real scraps into real spreads, and then those scraps aren't available anymore.
+- Each scrap gets a status: `available` · `used` (glued into a physical spread) · optionally `reserved` (set aside for a planned spread). There's an optional note or link to which spread.
+- Archive filter **"Available only"** is on by default when planning.
+- The Theme Blend agent skips `used` scraps unless asked ("include used ones for a digital-only page").
+- Marking is quick: long-press → "Mark as used", or multi-select → mark several.
+- This tracks the *physical* scrap. The *digital* cutout can still be reused on digital pages.
+
+**Other archive features:**
+- Scrap detail view: image, OCR text, tags (editable), palette swatches, source photo, split-from parent.
+- Long-press to multi-select, then "Add to page" or "Blend with agent" (pinned scraps).
 
 ### 4.3 Enrichment: OCR & Context (P1, Muse Spark)
 
@@ -263,7 +282,7 @@ A theme picker lives in a small settings sheet (palette icon on the Journals tab
 
 **Must-have for the video (A):**
 1. **Theme system + Desk tokens first:** display + body fonts, colour roles, paper texture, shadows, spacing, all as a `ThemeExtension`, so the Day 4–5 screens are built in the style and other themes can be added later.
-2. **Archive** as a scrapbook wall: masonry layout, tilted scraps with shadows, type filter chips.
+2. **Archive** as a scrapbook wall: masonry layout, tilted scraps with shadows, and the **combined filters from 4.2** (search, vibe, tags, type, colour, split-from, date).
 3. **Journal shelf:** textured cloth/kraft covers with a spine and title label.
 4. **Editor:** corner handles for scale and rotate (instead of a plain border), a tool bar styled like a strip of washi tape, light haptics on select and drop.
 5. **Scan session:** a nicer "finding pieces…" state (shimmer over the photo), and a short cut-out reveal animation when scraps come back.
@@ -455,7 +474,7 @@ Solo build: features are built **vertically** (app screen + its proxy endpoint t
 | **2** ✅ | Done: real SAM 3.1 + Muse Spark (Plan A chosen); sticker sheets split per sticker; full-resolution cutouts, hole filling, speck removal, scrap types; **scan session with contact-sheet batching** (16 pieces per ₱0.16 request); element detection proven live | ✅ Real cutouts on the tablet; 62 proxy + 19 app tests pass |
 | **3** ✅ | Done: canvas editor (drag/pinch/rotate, layers, handwriting text, paper styles, undo/redo, autosave, PNG export) + journal library + book with 3D page turn; Split built (quality in backlog) | ✅ **Cut line passed on the tablet** (Oct 30): scan → cut → collage → page flips; 65 proxy + 34 app tests |
 | **4** | **First hour:** theme system + Desk tokens (4.8 A1). **Then:** enrichment (OCR + tags + palette) + agent plan with `search_archive`, SSE progress, plan cards UI (built in the new style) | A theme prompt returns an approvable plan |
-| **5** | **Morning:** agent build (layout step + validation). **Afternoon:** UI/UX polish pass (4.8 A2–A6), then the Cozy cat theme if time. P2 (`generate_ephemera`, freehand, prompts) only if both are done. **Feature freeze tonight** | Agent builds a page end-to-end; every demo screen polished; demo assets cached |
+| **5** | **Morning:** agent build (layout step + validation). **Afternoon:** UI/UX polish pass (4.8 A2–A6) including **archive filters (4.2)**, then the Cozy cat theme if time. P2 (`generate_ephemera`, freehand, prompts) only if both are done. **Feature freeze tonight** | Agent builds a page end-to-end; every demo screen polished; demo assets cached |
 | **6** | **Demo video day:** script (section 7), record, edit. Fix only bugs that show up on camera. README with setup steps and a list of the Meta models used | Final video exported |
 | **7** | **Submission & social:** submit the repo + video, post on social media (cut a 30–60 s vertical clip from the video) | Submitted |
 

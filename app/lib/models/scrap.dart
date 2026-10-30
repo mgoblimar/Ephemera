@@ -18,6 +18,8 @@ class Scrap {
     this.description = '',
     this.enriched = false,
     this.entities = const {},
+    this.splitFromLabel,
+    this.parentScrapId,
   });
 
   final String id;
@@ -37,6 +39,14 @@ class Scrap {
 
   /// Read from the scrap by Muse Spark: date, time, place, brand, price.
   final Map<String, String> entities;
+
+  /// For Split elements: the label of the piece it was split from (e.g. "wrapper").
+  final String? splitFromLabel;
+
+  /// The parent's scrap id, when the parent was cut and saved too.
+  final String? parentScrapId;
+
+  bool get isSplitElement => splitFromLabel != null;
 
   Scrap copyWith({
     String? type,
@@ -64,6 +74,8 @@ class Scrap {
       description: description ?? this.description,
       enriched: enriched ?? this.enriched,
       entities: entities ?? this.entities,
+      splitFromLabel: splitFromLabel,
+      parentScrapId: parentScrapId,
     );
   }
 
@@ -83,6 +95,8 @@ class Scrap {
     'description': description,
     'enriched': enriched,
     'entities': entities,
+    'split_from_label': splitFromLabel,
+    'parent_scrap_id': parentScrapId,
   };
 
   factory Scrap.fromJson(Map<String, dynamic> json) {
@@ -106,6 +120,8 @@ class Scrap {
           (k, v) => MapEntry(k, v.toString()),
         ),
       ),
+      splitFromLabel: json['split_from_label'] as String?,
+      parentScrapId: json['parent_scrap_id'] as String?,
     );
   }
 }

@@ -10,7 +10,7 @@ Meta AI hackathon project (Indie track). Snap physical junk-journal scraps, cut 
 | 2 | Oct 30 | ✅ Real SAM + Muse Spark, full-res cutouts, scan session with contact-sheet batching, element Split (quality in backlog) |
 | 3 | Oct 31 | ✅ Canvas editor, library, page-flip book; **cut line passed on the tablet** |
 | 4 | Nov 1 | Theme system + Desk tokens first (SPEC 4.8 A1), then enrichment (Muse Spark OCR/tags) + agent plan step with `search_archive` |
-| 5 | Nov 2 | Morning: agent builds the page. Afternoon: **UI/UX polish pass** (SPEC 4.8), then Cozy cat theme if time. P2 only if time. **Feature freeze tonight** |
+| 5 | Nov 2 | Morning: agent builds the page. Afternoon: **UI/UX polish pass** (SPEC 4.8) incl. archive filters (SPEC 4.2), then Cozy cat theme if time. P2 only if time. **Feature freeze tonight** |
 | 6 | Nov 3 | Demo video only |
 | 7 | Nov 4 | Submit + social posts only |
 
@@ -71,6 +71,10 @@ flutter run -d R52X807YBTD --dart-define=PROXY_URL=http://127.0.0.1:8100        
 - Muse Wonder makes **3–4 parallel tool calls per turn**; every tool call needs its own tool response. Use the **Responses API** for the agent loop (keeps reasoning across turns).
 - Detection uses `reasoning_effort="minimal"` (≈6s); `low` was ~15s.
 - Element Split works for logos/lettering; loose boxes and busy backgrounds are poor → **backlog** (SPEC 4.1b). Refinement taps / edge snapping / "Find…" are **parked** (SPEC 4.1c).
+
+## Archive filters (SPEC 4.2)
+
+Combined filters: search text, vibe/mood, tags, type, colour, split-from, date added. Next iteration: `physical_status` (available / used / reserved) so scraps glued into real spreads can be filtered out and skipped by the agent.
 
 ## UI direction
 
