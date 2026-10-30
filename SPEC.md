@@ -251,7 +251,7 @@ Tuning (Oct 30, Muse Wonder): plan took ~80 s (6 searches, 3 turns) + layout ~11
 
 ### 4.6b Generated decorations — live result (Oct 30)
 
-Not an agent tool after all: the plan already proposes decorations, so Build makes them (`POST /agent/ephemera`) before the layout step, and the plan cards let the user switch each one off with the cost shown. Muse Image is asked for one object on plain white; the proxy removes the background colour connected to the border (white inside the design survives), so no SAM call is needed. Live (Cozy cat cafe theme): 4 decorations (sticker, washi tape, ticket, stamp) in ~26 s in parallel (~12 s each, one 26 s), all cleanly cut out; page built in ~38 s after approval. Cost ~₱2.56 for the four.
+Not an agent tool after all: the plan already proposes decorations, so Build makes them (`POST /agent/ephemera`) before the layout step, and the plan cards let the user switch each one off with the cost shown. Muse Image is asked for one object on plain white; the proxy removes the background colour connected to the border (white inside the design survives), so no SAM call is needed. Live (Cozy cat cafe theme): 4 decorations (sticker, washi tape, ticket, stamp) in ~26 s in parallel (~12 s each, one 26 s), all cleanly cut out; page built in ~38 s after approval. Cost ~₱2.56 for the four. Polish: the ticket/label prompts ask for a fully designed piece (title, illustration, fine print) with a clear margin on every side; near-white paper inside a perforated or dashed outline is kept by sealing small outline gaps before filling (a cream ticket stub had been punched through).
 
 ### 4.7 Import Existing Journal (Stretch: Style Profile only; rest post-hackathon)
 

@@ -135,6 +135,25 @@ void main() {
     expect(find.text('Draw'), findsOneWidget);
   });
 
+  testWidgets('a selected caption can be recoloured, and undo restores it', (
+    tester,
+  ) async {
+    await pumpEditor(tester);
+    await addCaption(tester, 'paint me');
+    Color colorOf() => tester.widget<Text>(find.text('paint me')).style!.color!;
+    final before = colorOf();
+
+    await tester.tap(find.text('Colour'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Colour').last); // the gold
+    await tester.pumpAndSettle();
+
+    expect(colorOf(), isNot(before));
+    await tester.tap(find.byTooltip('Undo'));
+    await tester.pumpAndSettle();
+    expect(colorOf(), before);
+  });
+
   testWidgets('delete removes the selected element; undo restores it', (
     tester,
   ) async {

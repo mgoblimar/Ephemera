@@ -66,3 +66,24 @@ def test_ephemera_route_rejects_unknown_kinds(client: TestClient) -> None:
     response = client.post("/agent/ephemera", json={"kind": "rocket", "prompt": "x"})
 
     assert response.status_code == 422
+
+
+def test_a_dashed_outline_keeps_its_near_white_inside() -> None:
+    # A ticket stub: cream paper drawn only as a dashed outline on white, so the
+    # paper inside touches the background through every gap between dashes.
+    image = Image.new("RGB", (400, 300), "white")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((60, 50, 340, 250), fill=(252, 248, 240))
+    for x in range(60, 340, 12):
+        draw.line((x, 50, x + 6, 50), fill=(90, 60, 40), width=2)
+        draw.line((x, 250, x + 6, 250), fill=(90, 60, 40), width=2)
+    for y in range(50, 250, 12):
+        draw.line((60, y, 60, y + 6), fill=(90, 60, 40), width=2)
+        draw.line((340, y, 340, y + 6), fill=(90, 60, 40), width=2)
+    draw.ellipse((170, 120, 230, 180), fill=(200, 80, 90))
+
+    alpha = _alpha(lift_off_background(image))
+
+    h, w = alpha.shape
+    assert alpha[h // 4, w // 4] > 220  # plain cream paper inside the outline stays
+    assert alpha[0, 0] < 30

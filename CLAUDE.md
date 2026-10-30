@@ -39,12 +39,12 @@ app/         Flutter Android app (Riverpod 2.x, local JSON + PNG storage)
 
 ```bash
 # proxy (from proxy/)
-.venv/Scripts/python -m pytest -q                       # 99 tests, all mocked, free
+.venv/Scripts/python -m pytest -q                       # 100 tests, all mocked, free
 .venv/Scripts/python -m uvicorn app.main:create_app --factory --port 8000          # mock mode
 USE_REAL_PROVIDERS=true .venv/Scripts/python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8100   # real models
 
 # app (from app/)
-dart format lib test && flutter analyze && flutter test  # 86 tests
+dart format lib test && flutter analyze && flutter test  # 87 tests
 adb reverse tcp:8100 tcp:8100
 flutter run -d R52X807YBTD --dart-define=PROXY_URL=http://127.0.0.1:8100        # tablet over USB
 ```

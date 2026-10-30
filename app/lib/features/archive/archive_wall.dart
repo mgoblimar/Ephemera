@@ -9,7 +9,9 @@ import 'package:ephemera_ai/theme.dart';
 
 const _gap = 14.0;
 const _matPadding = 8.0;
-const _maxTallness = 1.6; // height / column width; tall strips are shrunk
+const _maxTallness = 1.6;
+const _matRoundness =
+    0.3; // of the theme's card radius: crisp on Desk, soft on Cozy cat // height / column width; tall strips are shrunk
 
 /// How big a scrap is shown in a column: never taller than [_maxTallness]
 /// columns, and never enlarged past its own pixels (small scraps go blurry).
@@ -132,13 +134,19 @@ class ScrapCard extends StatelessWidget {
             Material(
               color: tokens.surface,
               elevation: 0,
-              borderRadius: BorderRadius.circular(3),
+              borderRadius: BorderRadius.circular(
+                tokens.cardRadius * _matRoundness,
+              ),
               child: InkWell(
                 onTap: onTap,
-                borderRadius: BorderRadius.circular(3),
+                borderRadius: BorderRadius.circular(
+                  tokens.cardRadius * _matRoundness,
+                ),
                 child: Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(3),
+                    borderRadius: BorderRadius.circular(
+                      tokens.cardRadius * _matRoundness,
+                    ),
                     boxShadow: tokens.shadow,
                     color: tokens.surface,
                   ),

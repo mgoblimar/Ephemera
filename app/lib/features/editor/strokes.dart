@@ -283,3 +283,45 @@ class _Choice extends StatelessWidget {
     );
   }
 }
+
+/// A small sheet of pen colours; returns the one tapped, or null.
+Future<Color?> pickPenColor(BuildContext context, {required Color current}) {
+  return showModalBottomSheet<Color>(
+    context: context,
+    builder: (sheet) {
+      final tokens = sheet.tokens;
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Colour', style: tokens.display(20)),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 14,
+                children: [
+                  for (final c in penColors(tokens))
+                    _Choice(
+                      label: 'Colour',
+                      selected: c.toARGB32() == current.toARGB32(),
+                      onTap: () => Navigator.pop(sheet, c),
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: c,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}

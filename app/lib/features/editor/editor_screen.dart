@@ -194,6 +194,14 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     if (element != null) _commit(_live.adding(element));
   }
 
+  Future<void> _recolorSelected() async {
+    final element = _selected;
+    if (element == null) return;
+    final color = await pickPenColor(context, current: Color(element.color));
+    if (color == null || !mounted) return;
+    _commit(_live.replacing(element.copyWith(color: color.toARGB32())));
+  }
+
   void _cyclePaper() {
     const styles = PaperStyle.values;
     _commit(_live.withPaper(styles[(_live.paper.index + 1) % styles.length]));
@@ -322,6 +330,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 onDuplicate: _duplicateSelected,
                 onDelete: _deleteSelected,
                 onEditText: _editSelectedText,
+                onColor: _selected!.kind == ElementKind.scrap
+                    ? null
+                    : _recolorSelected,
               )
             else
               _ToolBar(
@@ -378,6 +389,7 @@ class _SelectionBar extends StatelessWidget {
     required this.onDuplicate,
     required this.onDelete,
     required this.onEditText,
+    this.onColor,
   });
 
   final bool isText;
@@ -387,6 +399,9 @@ class _SelectionBar extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onEditText;
 
+  /// Recolour a drawing or caption; null hides the tool (scraps).
+  final VoidCallback? onColor;
+
   @override
   Widget build(BuildContext context) {
     return _WashiStrip(
@@ -395,6 +410,12 @@ class _SelectionBar extends StatelessWidget {
         children: [
           if (isText)
             _Tool(icon: Icons.edit_outlined, label: 'Edit', onTap: onEditText),
+          if (onColor != null)
+            _Tool(
+              icon: Icons.palette_outlined,
+              label: 'Colour',
+              onTap: onColor!,
+            ),
           _Tool(icon: Icons.flip_to_front, label: 'Forward', onTap: onForward),
           _Tool(icon: Icons.flip_to_back, label: 'Back', onTap: onBackward),
           _Tool(icon: Icons.copy_outlined, label: 'Copy', onTap: onDuplicate),
