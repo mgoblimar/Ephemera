@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:ephemera_ai/features/blend/theme_blend_screen.dart';
 import 'package:ephemera_ai/features/editor/editor_screen.dart';
 import 'package:ephemera_ai/features/editor/page_canvas.dart';
 import 'package:ephemera_ai/models/journal.dart';
@@ -72,6 +73,19 @@ class _BookScreenState extends ConsumerState<BookScreen> {
         ),
         backgroundColor: Color(journal.coverColor),
         foregroundColor: Palette.paper,
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ThemeBlendScreen(journal: journal),
+              ),
+            ),
+            style: TextButton.styleFrom(foregroundColor: Palette.paper),
+            icon: const Icon(Icons.auto_awesome),
+            label: const Text('Theme Blend'),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(

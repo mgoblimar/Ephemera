@@ -4,13 +4,18 @@ import 'dart:ui';
 
 import 'package:http/http.dart' as http;
 
+import 'package:ephemera_ai/models/blend_plan.dart';
 import 'package:ephemera_ai/models/scan.dart';
+import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/models/segmentation.dart';
 
 const _requestTimeout = Duration(seconds: 30);
 
 /// Detection and batched cutting upload/download full-size images.
 const _slowRequestTimeout = Duration(seconds: 90);
+
+/// The agent searches the archive over several model turns.
+const _agentTimeout = Duration(seconds: 150);
 
 /// Error from the proxy, carrying its envelope code and a user-facing message.
 class ProxyException implements Exception {
@@ -92,6 +97,35 @@ class ProxyClient {
         );
       }),
     );
+  }
+
+  /// Theme Blend agent: plans a page from the archive. Slow (agent loop).
+  Future<BlendPlan> agentPlan({
+    required String theme,
+    required List<Scrap> archive,
+    List<String> pinnedIds = const [],
+  }) async {
+    final data = await _postJson('/agent/plan', {
+      'theme': theme,
+      'pinned_ids': pinnedIds,
+      'archive': [
+        for (final s in archive)
+          {
+            'id': s.id,
+            'type': s.type,
+            'tags': s.tags.take(20).toList(),
+            'ocr_text': s.ocrText.length > 1000
+                ? s.ocrText.substring(0, 1000)
+                : s.ocrText,
+            'mood': s.mood.take(10).toList(),
+            'description': s.description.length > 600
+                ? s.description.substring(0, 600)
+                : s.description,
+            'palette': s.palette.take(8).toList(),
+          },
+      ],
+    }, timeout: _agentTimeout);
+    return BlendPlan.fromJson(data);
   }
 
   /// Muse Spark reads a scrap: OCR text, entities, tags, mood, description.

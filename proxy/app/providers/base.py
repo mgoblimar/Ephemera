@@ -3,10 +3,14 @@ and real implementations are interchangeable."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 from PIL import Image
+
+if TYPE_CHECKING:
+    from app.agent.archive_search import ScrapSummary
+    from app.agent.planner import BlendPlan
 
 
 @dataclass(frozen=True)
@@ -65,6 +69,12 @@ class SegmentationProvider(Protocol):
     def detect_elements(self, scrap: Image.Image) -> list[DetectedItem]:
         """Design elements (logos, lettering, illustrations...) inside one scrap's crop."""
         ...
+
+
+class AgentPlanner(Protocol):
+    """Theme Blend agent (Muse Wonder): theme + archive summaries -> Blend Plan."""
+
+    def plan(self, theme: str, pinned_ids: Sequence[str], archive: Sequence["ScrapSummary"]) -> "BlendPlan": ...
 
 
 class VisionLLMProvider(Protocol):

@@ -10,7 +10,7 @@ from app.envelope import install_error_handlers, ok
 from app.image_store import ImageStore
 from app.providers import build_providers
 from app.rate_limit import RateLimiter
-from app.routes import enrich, scan, segment
+from app.routes import agent, enrich, scan, segment
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -27,6 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(segment.router)
     app.include_router(enrich.router)
     app.include_router(scan.router)
+    app.include_router(agent.router)
 
     @app.get("/health")
     def health() -> dict[str, Any]:

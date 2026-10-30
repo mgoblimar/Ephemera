@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 
 from app.config import Settings
-from app.providers.base import SegmentationProvider, VisionLLMProvider
+from app.agent.planner import BlendPlanner
+from app.agent.transport import MockPlanner, agent_transport
+from app.providers.base import AgentPlanner, SegmentationProvider, VisionLLMProvider
 from app.providers.detector import SparkItemDetector
 from app.providers.enricher import SparkEnricher
 from app.providers.meta_client import build_client
@@ -14,12 +16,15 @@ from app.providers.sam import SamClient
 class Providers:
     segmentation: SegmentationProvider
     vision: VisionLLMProvider
+    agent: AgentPlanner
     mode: str
 
 
 def build_providers(settings: Settings) -> Providers:
     if not settings.use_real_providers:
-        return Providers(segmentation=MockSegmentationProvider(), vision=MockVisionLLMProvider(), mode="mock")
+        return Providers(
+            segmentation=MockSegmentationProvider(), vision=MockVisionLLMProvider(), agent=MockPlanner(), mode="mock"
+        )
 
     client = build_client(settings)
     segmentation = RealSegmentationProvider(
@@ -28,4 +33,5 @@ def build_providers(settings: Settings) -> Providers:
         strategy=settings.auto_detect_strategy,
     )
     vision = SparkEnricher(vision_transport(client, settings, what="Enrichment"))
-    return Providers(segmentation=segmentation, vision=vision, mode="real")
+    agent = BlendPlanner(agent_transport(client, settings))
+    return Providers(segmentation=segmentation, vision=vision, agent=agent, mode="real")
