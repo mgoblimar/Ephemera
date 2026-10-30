@@ -234,7 +234,18 @@ class _DropChip extends StatelessWidget {
         avatar: leading,
         label: Row(
           mainAxisSize: MainAxisSize.min,
-          children: [Text(label), const Icon(Icons.arrow_drop_down, size: 18)],
+          children: [
+            // Flexible: the chip can measure its label a fraction of a pixel
+            // short, which overflowed the row.
+            Flexible(
+              child: Text(
+                label,
+                softWrap: false,
+                overflow: TextOverflow.visible,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down, size: 18),
+          ],
         ),
         selected: active,
         showCheckmark: false,

@@ -47,6 +47,31 @@ void main() {
       expect(piece.area!.bottom, closeTo(60 / 300, 1e-9));
     });
 
+    test('cut results count broken pieces separately', () async {
+      final client = ProxyClient(
+        baseUrl: 'http://proxy',
+        httpClient: fakeProxy(
+          (_) => okEnvelope({
+            ...scanCutData(const []),
+            'missed': [
+              {'image_id': 'img1', 'piece_id': 'p0', 'reason': 'rough'},
+              {'image_id': 'img1', 'piece_id': 'p1', 'reason': 'not_found'},
+              {'image_id': 'img1', 'piece_id': 'p2'},
+            ],
+          }),
+        ),
+      );
+
+      final result = await client.scanCut(
+        pieces: const [],
+        style: CutStyle.tight,
+        size: CutSize.m,
+      );
+
+      expect(result.missedCount, 3);
+      expect(result.roughCount, 1);
+    });
+
     test('cutout sends style and size and parses scraps', () async {
       final log = <http.Request>[];
       final client = ProxyClient(

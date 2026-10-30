@@ -1,8 +1,14 @@
 import base64
 import io
+from collections.abc import Sequence
+from dataclasses import replace
 
+import numpy as np
 from fastapi.testclient import TestClient
 from PIL import Image
+
+from app.providers.base import DetectedItem, Mask, PixelBox
+from app.providers.mock import MockSegmentationProvider
 
 from tests.conftest import photo_bytes
 
@@ -85,6 +91,29 @@ def test_whole_piece_and_its_elements_cut_in_one_request(client: TestClient) -> 
     assert logo["width"] < whole["width"]
 
 
+class _SliverElements(MockSegmentationProvider):
+    """The mock's logo and lettering, plus a thin strip of side text and a speck of a badge."""
+
+    def detect_elements(self, scrap: Image.Image) -> list[DetectedItem]:
+        width, height = scrap.size
+        return [
+            *super().detect_elements(scrap),
+            DetectedItem(label="lettering", box=PixelBox(width - 12, 0, width - 2, height)),
+            DetectedItem(label="badge", box=PixelBox(0, 0, width // 12, height // 12)),
+        ]
+
+
+def test_split_drops_slivers_and_specks(client: TestClient) -> None:
+    client.app.state.providers = replace(client.app.state.providers, segmentation=_SliverElements())
+    data = _detect(client, (3000, 2000))
+
+    split = client.post(
+        "/scan/split", json={"image_id": data["image_id"], "piece_id": data["pieces"][1]["id"]}
+    ).json()["data"]
+
+    assert [p["label"] for p in split["pieces"]] == ["logo", "lettering"]
+
+
 def test_split_unknown_piece_is_404(client: TestClient) -> None:
     data = _detect(client)
 
@@ -100,3 +129,27 @@ def test_unknown_piece_is_a_404_envelope(client: TestClient) -> None:
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "piece_not_found"
+
+
+class _FragmentSam(MockSegmentationProvider):
+    """Returns an L of thin strips for the second box: the shape of a torn, half-hidden piece."""
+
+    def segment_boxes(self, image: Image.Image, boxes: Sequence[PixelBox]) -> list[Mask | None]:
+        masks = super().segment_boxes(image, boxes)
+        b = boxes[1]
+        alpha = np.zeros((image.height, image.width), dtype=np.float32)
+        alpha[b.top : b.top + 6, b.left : b.right] = 1.0
+        alpha[b.top : b.bottom, b.right - 6 : b.right] = 1.0
+        masks[1] = Mask(alpha=alpha, score=0.9)
+        return masks
+
+
+def test_broken_cutouts_are_reported_as_rough_instead_of_saved(client: TestClient) -> None:
+    client.app.state.providers = replace(client.app.state.providers, segmentation=_FragmentSam())
+    photo = _detect(client)
+    refs = [{"image_id": photo["image_id"], "piece_id": p["id"]} for p in photo["pieces"]]
+
+    data = client.post("/scan/cut", json={"pieces": refs, "cut_style": "tight"}).json()["data"]
+
+    assert [s["piece_id"] for s in data["scraps"]] == [photo["pieces"][0]["id"], photo["pieces"][2]["id"]]
+    assert data["missed"] == [{**refs[1], "reason": "rough"}]

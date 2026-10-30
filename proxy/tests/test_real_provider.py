@@ -28,7 +28,7 @@ def test_plan_a_sends_detected_boxes_to_sam_and_keeps_labels() -> None:
         return sam_line(*records)
 
     detector = _detector(
-        [{"label": "ticket", "box": [0, 0, 250, 333]}, {"label": "botanical", "box": [500, 0, 750, 333]}]
+        [{"label": "ticket", "box": [0, 0, 100, 100]}, {"label": "botanical", "box": [200, 0, 300, 100]}]
     )
     provider = RealSegmentationProvider(SamClient(sam), detector, strategy="spark_boxes")
 

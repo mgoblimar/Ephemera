@@ -17,7 +17,18 @@ from app.config import Settings
 from app.contact_sheet import Piece, SheetCell, build_sheet, mask_for_piece
 from app.envelope import ApiError, ok
 from app.image_store import ImageStore, StoredImage
-from app.imaging import CutSize, CutStyle, apply_cut_style, border_px, dominant_palette, jpeg_bytes, png_bytes
+from app.imaging import (
+    ROUGH_SOLIDITY,
+    CutSize,
+    CutStyle,
+    apply_cut_style,
+    border_px,
+    clean_mask,
+    dominant_palette,
+    jpeg_bytes,
+    mask_solidity,
+    png_bytes,
+)
 from app.providers import Providers
 from app.providers.base import DetectedItem, PixelBox
 from app.providers.sam import MAX_OBJECTS_PER_REQUEST
@@ -27,6 +38,8 @@ router = APIRouter(prefix="/scan", tags=["scan"])
 
 THUMB_SIDE = 256
 MAX_PIECES_PER_CUT = 64  # cut in batches of 16, one SAM request each
+MIN_ELEMENT_SIDE = 64  # original-photo pixels; thinner elements are blurry slivers
+MIN_ELEMENT_AREA_FRACTION = 0.02  # of the parent piece's area
 
 
 class PieceRef(BaseModel):
@@ -99,9 +112,9 @@ def split(
     model_view.thumbnail((config.max_image_side, config.max_image_side))  # max detail for the model
     view_scale = close_up.width / model_view.width
 
+    found = [(e.label, _offset(e.box, view_scale, whole)) for e in models.segmentation.detect_elements(model_view)]
     elements = [
-        DetectedItem(label=e.label, box=_to_working(entry, _offset(e.box, view_scale, whole)))
-        for e in models.segmentation.detect_elements(model_view)
+        DetectedItem(label=label, box=_to_working(entry, box)) for label, box in found if _big_enough(box, whole)
     ]
     element_ids = store.add_pieces(body.image_id, elements)
     return ok(
@@ -113,6 +126,13 @@ def split(
             ],
         }
     )
+
+
+def _big_enough(box: PixelBox, parent: PixelBox) -> bool:
+    """Tiny elements (side text, small badges) cut out as blurry slivers, so they're not offered."""
+    width, height = box.right - box.left, box.bottom - box.top
+    parent_area = (parent.right - parent.left) * (parent.bottom - parent.top)
+    return min(width, height) >= MIN_ELEMENT_SIDE and width * height >= MIN_ELEMENT_AREA_FRACTION * parent_area
 
 
 def _offset(box: PixelBox, scale: float, origin: PixelBox) -> PixelBox:
@@ -178,19 +198,25 @@ def cut(
         masks = models.segmentation.segment_boxes(sheet.image, [cell.prompt_box for cell in sheet.cells])
         for (ref, _, label, piece), cell, mask in zip(batch, sheet.cells, masks, strict=True):
             if mask is None:
-                missed.append(ref.model_dump())
+                missed.append({**ref.model_dump(), "reason": "not_found"})
                 continue
-            scraps.append(_scrap_json(ref, label, piece, cell, mask.alpha, body.cut_style, body.cut_size))
+            alpha = clean_mask(mask_for_piece(mask.alpha, cell))
+            if mask_solidity(alpha) < ROUGH_SOLIDITY:
+                # Half-hidden or torn pieces come back as fragments; don't save junk.
+                missed.append({**ref.model_dump(), "reason": "rough"})
+                continue
+            scraps.append(_scrap_json(ref, label, piece, cell, alpha, body.cut_style, body.cut_size))
     return ok({"scraps": scraps, "missed": missed, "sam_requests": len(batches)})
 
 
 def _scrap_json(
-    ref: PieceRef, label: str, piece: Piece, cell: SheetCell, sheet_alpha: np.ndarray, style: CutStyle, size: CutSize
+    ref: PieceRef, label: str, piece: Piece, cell: SheetCell, alpha: np.ndarray, style: CutStyle, size: CutSize
 ) -> dict[str, Any]:
+    """`alpha` is the piece's mask over its region of the full-size photo."""
     r = cell.region
     scrap = apply_cut_style(
         piece.photo.crop((r.left, r.top, r.right, r.bottom)),
-        mask_for_piece(sheet_alpha, cell),
+        alpha,
         style,
         size,
         border=border_px(size, piece.photo.size),

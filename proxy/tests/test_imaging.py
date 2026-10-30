@@ -2,7 +2,16 @@ import numpy as np
 from PIL import Image
 
 from app.image_store import ImageStore
-from app.imaging import apply_cut_style, cut_from_original, dominant_palette, drop_islands, fill_holes, mask_bbox
+from app.imaging import (
+    ROUGH_SOLIDITY,
+    apply_cut_style,
+    cut_from_original,
+    dominant_palette,
+    drop_islands,
+    fill_holes,
+    mask_bbox,
+    mask_solidity,
+)
 from app.providers.mock import ellipse_mask
 
 PHOTO = Image.new("RGB", (300, 200), (40, 90, 160))
@@ -137,3 +146,18 @@ def test_image_store_masks_are_read_only() -> None:
         pass
     else:
         raise AssertionError("masks mapping should be immutable")
+
+
+def test_solidity_is_high_for_a_whole_piece_and_low_for_fragments() -> None:
+    whole = np.zeros((200, 200), dtype=np.float32)
+    whole[40:160, 30:170] = 1.0
+    fragments = np.zeros((200, 200), dtype=np.float32)
+    fragments[10:30, 10:190] = 1.0  # a long strip along the top...
+    fragments[10:190, 170:190] = 1.0  # ...and down the side: an L of torn edges
+
+    assert mask_solidity(whole) > 0.95
+    assert mask_solidity(fragments) < ROUGH_SOLIDITY
+
+
+def test_solidity_of_an_empty_mask_is_zero() -> None:
+    assert mask_solidity(np.zeros((50, 50), dtype=np.float32)) == 0.0

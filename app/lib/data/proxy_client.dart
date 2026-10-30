@@ -245,6 +245,7 @@ class ProxyClient {
       'cut_style': style.name,
       'cut_size': size.name,
     }, timeout: _slowRequestTimeout);
+    final missed = data['missed'] as List<dynamic>;
     return ScanCutResult(
       scraps: List.unmodifiable(
         (data['scraps'] as List<dynamic>).map((raw) {
@@ -264,7 +265,10 @@ class ProxyClient {
           );
         }),
       ),
-      missedCount: (data['missed'] as List<dynamic>).length,
+      missedCount: missed.length,
+      roughCount: missed
+          .where((m) => m is Map && m['reason'] == 'rough')
+          .length,
       samRequests: data['sam_requests'] as int,
     );
   }

@@ -14,7 +14,7 @@ Meta AI hackathon project (Indie track). Snap physical junk-journal scraps, cut 
 | 6 | Nov 3 | Demo video only |
 | 7 | Nov 4 | Submit + social posts only |
 
-**Where we stopped:** Day 5 morning done: the agent layout step works live (hero scrap, layering, captions placed; backend clamps + de-overlaps). Known: plan ~32 s + layout ~15 s (tune effort/turns); weak Split elements can be picked (agent sees text only). **Next: Day 5 afternoon** — UI polish + archive filters (SPEC 4.8 A2–A6, 4.2), then Cozy cat theme if time; switch AGENT_MODEL to muse-wonder-1.0 and re-test before recording.
+**Where we stopped:** Day 5 afternoon polish done (archive wall + filters, cloth covers, editor corner handle + washi toolbar, scan shimmer/reveal, piece review sheet, app icon + splash). Scan tuning started (SPEC 4.1b "Scan tuning"): pixel-coordinate boxes, stricter detect/split prompts, solidity junk filter, `scripts/scan_eval.py` test run. **Next:** Cozy cat theme if time; switch AGENT_MODEL to muse-wonder-1.0 and re-test before recording; more scan tuning (glossy "photo" elements, shadows in boxes) only if time.
 
 ## Repo layout
 
@@ -27,7 +27,7 @@ proxy/       FastAPI backend: holds Meta API keys, wraps each model behind an ad
   app/routes/      segment.py (old per-photo flow), scan.py (detect / split / cut), enrich.py (mock)
   app/contact_sheet.py  packs ≤16 pieces from many photos into one SAM request
   app/imaging.py   upload validation, cut styles, cut_from_original, fill_holes, drop_islands, palette
-  scripts/         muse_tool_call_check.py, segment_photo_check.py (live checks, cost credits)
+  scripts/         muse_tool_call_check.py, segment_photo_check.py, scan_eval.py (live checks, cost credits)
 app/         Flutter Android app (Riverpod 2.x, local JSON + PNG storage)
   lib/features/scan/      scan session (main capture flow) + Split
   lib/features/editor/    page canvas, editor, undo/redo history, handwriting fonts
@@ -39,12 +39,12 @@ app/         Flutter Android app (Riverpod 2.x, local JSON + PNG storage)
 
 ```bash
 # proxy (from proxy/)
-.venv/Scripts/python -m pytest -q                       # 65 tests, all mocked, free
+.venv/Scripts/python -m pytest -q                       # 92 tests, all mocked, free
 .venv/Scripts/python -m uvicorn app.main:create_app --factory --port 8000          # mock mode
 USE_REAL_PROVIDERS=true .venv/Scripts/python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8100   # real models
 
 # app (from app/)
-dart format lib test && flutter analyze && flutter test  # 34 tests
+dart format lib test && flutter analyze && flutter test  # 63 tests
 adb reverse tcp:8100 tcp:8100
 flutter run -d R52X807YBTD --dart-define=PROXY_URL=http://127.0.0.1:8100        # tablet over USB
 ```
@@ -70,6 +70,7 @@ flutter run -d R52X807YBTD --dart-define=PROXY_URL=http://127.0.0.1:8100        
 - SAM output parsing uses our fast regex parser + `meta_sam_parser._mask_codec._decode_raster` (internal, single pass); `meta-sam-parser==0.1.0` is **pinned** for that reason. Masks are binary and lower-res than the box.
 - Muse Wonder makes **3–4 parallel tool calls per turn**; every tool call needs its own tool response. Use the **Responses API** for the agent loop (keeps reasoning across turns).
 - Detection uses `reasoning_effort="minimal"` (≈6s); `low` was ~15s.
+- **Spark boxes are asked for in pixels with the image size in the prompt** (0–1000 grid was up to 3% off on portrait photos). Cut-outs with mask solidity < 0.6 are dropped as `rough`.
 - **Meta's Responses API only accepts `tool_choice="auto"`** — to stop tool use, omit `tools` instead (agent transport does this when the 8-search budget is spent).
 - Element Split works for logos/lettering; loose boxes and busy backgrounds are poor → **backlog** (SPEC 4.1b). Refinement taps / edge snapping / "Find…" are **parked** (SPEC 4.1c).
 

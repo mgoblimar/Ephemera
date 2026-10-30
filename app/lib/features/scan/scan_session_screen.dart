@@ -169,11 +169,8 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
       );
       final saved = await _saveByPhoto(result);
       if (!mounted) return;
-      if (result.missedCount > 0) {
-        _showMessage(
-          "${result.missedCount} piece(s) couldn't be cut out. Try a clearer photo.",
-        );
-      }
+      final message = _missedMessage(result);
+      if (message != null) _showMessage(message);
       if (saved == 0) {
         Navigator.pop(context, saved);
         return;
@@ -229,6 +226,18 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
       parentPieceId: parentId,
       parentLabel: pieces[parentId]?.label,
     );
+  }
+
+  /// Why some chosen pieces didn't make it into the archive, or null if all did.
+  static String? _missedMessage(ScanCutResult result) {
+    final rough = result.roughCount;
+    final notFound = result.missedCount - rough;
+    final parts = [
+      if (rough > 0) '$rough came out too broken to keep (half hidden or torn)',
+      if (notFound > 0) "$notFound couldn't be found",
+    ];
+    if (parts.isEmpty) return null;
+    return '${parts.join(' and ')}. Try a plainer background, one layer of scraps.';
   }
 
   void _showMessage(String message) {

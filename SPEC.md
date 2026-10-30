@@ -109,8 +109,16 @@ A scrap often holds smaller designs worth cutting out on their own: the SUMO let
 - Good: logos and lettering with their own outline. The SUMO logo is clean after speck removal.
 - Poor: Spark's boxes are loose or overlap neighbours (a badge swallowed an adjacent cookie and background). Shapes printed on busy backgrounds (a milk splash) give vague regions.
 
+**Scan tuning (Day 5, 2026-10-30).** `proxy/scripts/scan_eval.py` runs a fixed set of 7 photos (5 real tablet scans + 2 test photos, ignored folder `proxy/test_photos/eval`) through detect / split / cut and writes review boards plus a per-cutout shape score. About ₱0.6 per full run, ₱0.2 for split photos only.
+- **Box coordinates:** on drawn test shapes, Spark was within ~15 px when asked for **pixel** boxes with the image size stated, but up to 3% off on the 0–1000 grid for portrait images. Both prompts now use pixels.
+- **Detect prompt:** only pieces seen whole (skip half-hidden, cut off by the edge, piles/shop displays); hug the piece's own edge without backing card, sleeve or shadow. The shop-shelf photo went from 13 pieces (most junk) to 1.
+- **Split prompt:** ignore the table, shadow and neighbours in the crop; skip see-through windows, tiny marks and pictures that blend in. M&M box: 5/5 clean elements, tiny badges and window gone. Sumo: shadow "illustrations" gone.
+- **Junk filter:** cut-outs whose cleaned mask fills under 60% of its convex hull (solidity) are not saved and come back as `missed` with `reason: "rough"`; the app says how many were too broken. On 76 real cut-outs every one under 0.6 was junk; curvy good pieces scored 0.72+.
+- **Tiny elements:** Split drops elements thinner than 64 px (full-size photo) or under 2% of the parent's area; side text and small badges came out as blurry slivers. The archive wall never enlarges a scrap past its own pixels and caps tall strips at 1.6× the column width.
+- Still weak: Spark boxes include cast shadows (SAM ignores them for whole pieces); "photo" elements on glossy wrappers (milk splash, cookies) still bleed — solidity 0.66–0.88, so the filter can't catch them; the review sheet lets the user drop them.
+
 **Backlog ideas to improve it:**
-1. Ask Spark for tighter boxes and only "clear, self-contained" elements, and drop overlapping or huge boxes server-side.
+1. ~~Ask Spark for tighter boxes and only "clear, self-contained" elements~~ (done Day 5, see above); still to try: drop overlapping or huge boxes server-side.
 2. Run SAM per element with negative points on neighbouring elements, so they don't merge.
 3. Refinement taps (4.1c) for manual fixes.
 4. Edge snapping.

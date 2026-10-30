@@ -10,6 +10,7 @@ from typing import Literal
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
 from scipy.ndimage import binary_fill_holes, label
+from scipy.spatial import ConvexHull, QhullError
 
 from app.envelope import ApiError
 
@@ -28,6 +29,10 @@ DILATE_THRESHOLD = 0.023
 STICKER_WHITE = 255
 # Mask parts smaller than this fraction of the largest part are treated as stray specks.
 ISLAND_KEEP_FRACTION = 0.15
+# A cleaned mask filling less than this share of its convex hull is fragments, not a piece:
+# on 76 real cutouts every one below 0.6 was junk, while curvy pieces (a bow) scored 0.72+.
+ROUGH_SOLIDITY = 0.6
+SOLIDITY_STRIDE = 4  # sample every 4th pixel; plenty for a shape measure
 
 
 def load_upload(data: bytes, max_bytes: int, max_side: int, keep_alpha: bool = False) -> Image.Image:
@@ -110,6 +115,25 @@ def fill_holes(alpha: np.ndarray) -> np.ndarray:
     return np.maximum(alpha, filled.astype(np.float32))
 
 
+def clean_mask(alpha: np.ndarray) -> np.ndarray:
+    """Drop stray specks, then fill enclosed gaps: the mask a cutout is made from."""
+    return fill_holes(drop_islands(alpha))
+
+
+def mask_solidity(alpha: np.ndarray) -> float:
+    """Share of its convex hull the mask fills: near 1 for a ticket, low for torn fragments."""
+    small = alpha[::SOLIDITY_STRIDE, ::SOLIDITY_STRIDE] > MASK_THRESHOLD
+    ys, xs = np.nonzero(small)
+    if xs.size == 0:
+        return 0.0
+    try:
+        hull = ConvexHull(np.column_stack([xs, ys])).volume  # in 2-D, "volume" is the area
+    except QhullError:
+        return 1.0  # a single row or column of pixels: a thin strip, not fragments
+    # Hulls through pixel centres are slightly smaller than the pixels they wrap.
+    return min(1.0, float(small.sum()) / max(hull, 1.0))
+
+
 def border_px(size: CutSize, photo_size: tuple[int, int]) -> float:
     return CUT_SIZE_FRACTION[size] * max(photo_size)
 
@@ -160,7 +184,7 @@ def apply_cut_style(
     """
     rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
     border = border_px(size, image.size) if border is None else border
-    alpha = fill_holes(drop_islands(alpha))
+    alpha = clean_mask(alpha)
 
     if style == "tight":
         out_rgb, out_alpha = rgb, feather(alpha)

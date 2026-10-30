@@ -70,12 +70,16 @@ class ScanCutResult {
     required this.scraps,
     required this.missedCount,
     required this.samRequests,
+    this.roughCount = 0,
   });
 
   /// Cutouts; [CutoutScrap.maskId] holds the piece id, keyed by image below.
   final List<({String imageId, CutoutScrap scrap})> scraps;
   final int missedCount;
   final int samRequests;
+
+  /// Of [missedCount]: pieces SAM cut but that came out as broken fragments.
+  final int roughCount;
 }
 
 /// One photo in the session: detected cheaply, its pieces chosen later.
