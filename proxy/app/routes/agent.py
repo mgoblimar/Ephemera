@@ -1,6 +1,7 @@
 """Theme Blend agent routes (SPEC 4.6): plan a page, then lay it out."""
 
-from typing import Annotated, Any
+import base64
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -8,6 +9,8 @@ from pydantic import BaseModel, Field
 from app.agent.archive_search import ScrapSummary
 from app.agent.layout import LayoutScrap
 from app.envelope import ApiError, ok
+from app.ephemera import ephemera_prompt, lift_off_background
+from app.imaging import dominant_palette, png_bytes
 from app.providers import Providers
 from app.routes import deps
 
@@ -65,6 +68,28 @@ class LayoutRequest(BaseModel):
     paper: str = Field(default="cream", max_length=20)
     scraps: list[LayoutScrapIn] = Field(min_length=1, max_length=12)
     captions: list[str] = Field(default_factory=list, max_length=3)
+
+
+class EphemeraRequest(BaseModel):
+    kind: Literal["stamp", "tape", "label", "ticket", "sticker"]
+    prompt: str = Field(min_length=1, max_length=300)
+    palette: list[Annotated[str, Field(pattern=r"^#[0-9A-Fa-f]{6}$")]] = Field(default_factory=list, max_length=6)
+
+
+@router.post("/ephemera")
+def ephemera(body: EphemeraRequest, models: Annotated[Providers, Depends(deps.providers)]) -> dict[str, Any]:
+    """Generate one decoration with Muse Image and return it as a cut-out (~₱0.64)."""
+    picture = models.image.generate(ephemera_prompt(body.kind, body.prompt, body.palette))
+    cut = lift_off_background(picture)
+    return ok(
+        {
+            "kind": body.kind,
+            "png_base64": base64.b64encode(png_bytes(cut)).decode("ascii"),
+            "width": cut.width,
+            "height": cut.height,
+            "palette": dominant_palette(cut),
+        }
+    )
 
 
 @router.post("/layout")

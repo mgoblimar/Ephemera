@@ -86,6 +86,12 @@ class PageDesigner(Protocol):
     ) -> "PageLayout": ...
 
 
+class ImageGenerator(Protocol):
+    """Muse Image: a text prompt in, one picture out."""
+
+    def generate(self, prompt: str) -> Image.Image: ...
+
+
 class VisionLLMProvider(Protocol):
     """Muse Spark."""
 

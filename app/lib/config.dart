@@ -17,3 +17,6 @@ const piecesPerSamRequest = 16;
 
 /// Shown to the user before cutting; SAM 3.1 is $0.0025 per request at ₱64/USD.
 const samRequestCostPesos = 0.16;
+
+/// Shown before building a page: Muse Image is $0.01 per decoration at ₱64/USD.
+const decorationCostPesos = 0.64;

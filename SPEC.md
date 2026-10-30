@@ -41,7 +41,7 @@ With 7 days left, the scope is tiered so that each tier is demoable on its own.
 | **P1** | **Theme Blend Agent** (Muse Wonder), `search_archive` tool | Plan → approve → build |
 | **P1** | Freehand drawing | Simple pen strokes |
 | **P1** | **UI/UX polish pass** (4.8) | The demo video is judged on looks: style, motion, empty states, app icon |
-| **P2** | Agent `generate_ephemera` tool (Muse Image) | Stamps, tape strips, labels |
+| **P2** | Agent `generate_ephemera` tool (Muse Image) | ✅ Built Oct 30 as a Build step: plan lists up to 4 decorations (toggle each, ₱0.64 each), Build makes them in parallel, lifts them off the white background, saves them as `generated` scraps and lays them out with the rest |
 | **P2** | Journal prompts & captions | Reuses the enrichment call; cheap if OCR works |
 | **Stretch** | Import an existing physical journal: **Style Profile only** | One Muse Spark call over page photos, fed to the agent |
 | Post-hackathon | Journal import: re-extract scraps + read-only digital copy | Kept in the spec (4.7) as the roadmap |
@@ -248,6 +248,10 @@ Layout is not a tool. It is a final structured-output step: Muse Wonder receives
 Tested on the tablet: a "black + gold" Kuromi theme gave a composed page — cut-out figure as the large hero layered over two tilted boxes, stickers at the edges, two captions placed in free space. Backend safety pass (clamp + de-overlap above 35% of the smaller scrap) kept everything on the page.
 
 Tuning (Oct 30, Muse Wonder): plan took ~80 s (6 searches, 3 turns) + layout ~11 s. Now one parallel search round (tools dropped after it) and layout at `minimal` effort: plan ~25 s (4 searches, 2 turns) + layout ~7 s, ~₱4.5 per page, same quality. Still in backlog: the agent only sees text, so weak Split elements can be chosen → hide tiny/low-quality elements from search or let users delete junk scraps. Meta only supports `tool_choice="auto"` (fixed: tools are omitted once the search budget is spent).
+
+### 4.6b Generated decorations — live result (Oct 30)
+
+Not an agent tool after all: the plan already proposes decorations, so Build makes them (`POST /agent/ephemera`) before the layout step, and the plan cards let the user switch each one off with the cost shown. Muse Image is asked for one object on plain white; the proxy removes the background colour connected to the border (white inside the design survives), so no SAM call is needed. Live (Cozy cat cafe theme): 4 decorations (sticker, washi tape, ticket, stamp) in ~26 s in parallel (~12 s each, one 26 s), all cleanly cut out; page built in ~38 s after approval. Cost ~₱2.56 for the four.
 
 ### 4.7 Import Existing Journal (Stretch: Style Profile only; rest post-hackathon)
 

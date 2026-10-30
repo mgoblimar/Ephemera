@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
+import 'package:ephemera_ai/models/blend_plan.dart';
 import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/models/segmentation.dart';
 
@@ -16,6 +17,9 @@ abstract interface class ScrapRepository {
     required Uint8List photoJpeg,
     required List<CutoutScrap> cutouts,
   });
+
+  /// Saves a decoration made by the image model (source: generated).
+  Future<Scrap> saveGenerated(GeneratedEphemera ephemera);
 
   /// Replaces a stored scrap's metadata (e.g. after enrichment).
   Future<void> update(Scrap scrap);
@@ -117,6 +121,34 @@ class FileScrapRepository implements ScrapRepository {
     ]);
     return List.unmodifiable(scraps);
   }
+
+  @override
+  Future<Scrap> saveGenerated(GeneratedEphemera ephemera) =>
+      _serially(() async {
+        await _scrapDir.create(recursive: true);
+        final id = _uuid.v4();
+        final pngPath = p.join(_scrapDir.path, '$id.png');
+        await File(pngPath).writeAsBytes(ephemera.png, flush: true);
+        final scrap = Scrap(
+          id: id,
+          pngPath: pngPath,
+          width: ephemera.width,
+          height: ephemera.height,
+          source: ScrapSource.generated,
+          createdAt: _clock(),
+          type: ephemera.kind,
+          tags: List.unmodifiable(['generated', ephemera.kind]),
+          palette: ephemera.palette,
+          description: ephemera.prompt,
+          // The prompt already describes it; no need to pay for enrichment.
+          enriched: true,
+        );
+        await _writeList(_scrapIndex, [
+          ...await _readList(_scrapIndex),
+          scrap.toJson(),
+        ]);
+        return scrap;
+      });
 
   @override
   Future<void> update(Scrap scrap) => _serially(() async {

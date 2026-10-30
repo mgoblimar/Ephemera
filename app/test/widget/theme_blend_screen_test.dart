@@ -8,8 +8,10 @@ import 'package:http/http.dart' as http;
 
 import 'package:ephemera_ai/data/journal_repository.dart';
 import 'package:ephemera_ai/data/proxy_client.dart';
+import 'package:ephemera_ai/data/scrap_repository.dart';
 import 'package:ephemera_ai/features/blend/simple_layout.dart';
 import 'package:ephemera_ai/features/blend/theme_blend_screen.dart';
+import 'package:ephemera_ai/features/editor/editor_screen.dart';
 import 'package:ephemera_ai/features/editor/handwriting.dart';
 import 'package:ephemera_ai/models/journal.dart';
 import 'package:ephemera_ai/models/scrap.dart';
@@ -51,8 +53,23 @@ Map<String, dynamic> _planJson() => {
   'tool_calls': 3,
 };
 
+/// A 1x1 PNG, standing in for a generated decoration.
+const _pixelPng =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
 Map<String, dynamic> _respond(http.Request request, bool layoutFails) {
-  if (request.url.path != '/agent/layout') return okEnvelope(_planJson());
+  switch (request.url.path) {
+    case '/agent/plan':
+      return okEnvelope(_planJson());
+    case '/agent/ephemera':
+      return okEnvelope({
+        'kind': 'stamp',
+        'png_base64': _pixelPng,
+        'width': 40,
+        'height': 30,
+        'palette': ['#6B4F3A'],
+      });
+  }
   if (layoutFails) {
     return {
       'ok': false,
@@ -60,16 +77,28 @@ Map<String, dynamic> _respond(http.Request request, bool layoutFails) {
       'error': {'code': 'model_error', 'message': 'down'},
     };
   }
+  final sent = jsonDecode(request.body) as Map<String, dynamic>;
   return okEnvelope({
     'placements': [
-      {
-        'id': 'r1',
-        'cx': 0.3,
-        'cy': 0.25,
-        'width': 0.5,
-        'rotation_deg': -6,
-        'z': 1,
-      },
+      for (final s in sent['scraps'] as List<dynamic>)
+        if ((s as Map<String, dynamic>)['id'] == 'r1')
+          {
+            'id': 'r1',
+            'cx': 0.3,
+            'cy': 0.25,
+            'width': 0.5,
+            'rotation_deg': -6,
+            'z': 1,
+          }
+        else
+          {
+            'id': s['id'],
+            'cx': 0.7,
+            'cy': 0.6,
+            'width': 0.2,
+            'rotation_deg': 4,
+            'z': 2,
+          },
       {
         'id': 'ghost',
         'cx': 0.5,
@@ -140,6 +169,10 @@ void main() {
             ),
           ),
           scrapsProvider.overrideWith((ref) async => _archive),
+          scrapRepositoryProvider.overrideWith(
+            (ref) async =>
+                FileScrapRepository(Directory('${root.path}/archive')),
+          ),
           journalRepositoryProvider.overrideWith((ref) async => repository),
         ],
         child: MaterialApp(home: ThemeBlendScreen(journal: journal)),
@@ -147,6 +180,26 @@ void main() {
     );
     await tester.pumpAndSettle();
     return repository;
+  }
+
+  /// Taps Build and waits for the editor to open (the page is saved by then).
+  /// Reading the journal file while the app writes it locks it on Windows.
+  Future<Journal?> buildAndWait(
+    WidgetTester tester,
+    String label,
+    FileJournalRepository repository,
+  ) {
+    return tester.runAsync<Journal?>(() async {
+      await tester.tap(find.text(label));
+      for (var i = 0; i < 300; i++) {
+        await tester.pump();
+        if (find.byType(EditorScreen).evaluate().isNotEmpty) {
+          return (await repository.getAll()).single;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      return null;
+    });
   }
 
   testWidgets('an empty theme shows a hint instead of calling the agent', (
@@ -177,7 +230,15 @@ void main() {
     expect((sent['archive'] as List), hasLength(3));
     expect(find.text('Slow Sunday'), findsOneWidget);
     expect(find.text('The café receipt sets the morning.'), findsOneWidget);
-    expect(find.text('Build page with 2 scraps'), findsOneWidget);
+    expect(
+      find.textContaining('coffee stamp', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.text('1 decoration · ≈₱0.64'), findsOneWidget);
+    expect(
+      find.text('Build page with 2 scraps + 1 decoration'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('dropping a scrap and building adds a page with the rest', (
@@ -191,20 +252,23 @@ void main() {
 
     await tester.tap(find.text('The bus ride there.'));
     await tester.pump();
+    await tester.ensureVisible(
+      find.textContaining('coffee stamp', findRichText: true),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.textContaining('coffee stamp', findRichText: true),
+    ); // and skip the decoration
+    await tester.pump();
     expect(find.text('Build page with 1 scrap'), findsOneWidget);
     await tester.ensureVisible(find.text('Build page with 1 scrap'));
     await tester.pumpAndSettle();
 
-    final journal = await tester.runAsync(() async {
-      await tester.tap(find.text('Build page with 1 scrap'));
-      for (var i = 0; i < 100; i++) {
-        await tester.pump();
-        final j = (await repository.getAll()).single;
-        if (j.pages.length == 2) return j;
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
-      return null;
-    });
+    final journal = await buildAndWait(
+      tester,
+      'Build page with 1 scrap',
+      repository,
+    );
 
     final page = journal!.pages.last;
     expect(page.paper, PaperStyle.kraft);
@@ -217,6 +281,42 @@ void main() {
     expect(scrap.size, closeTo(0.5, 1e-9));
     expect(page.elements.last.text, '9:42, still sleepy');
     expect(log.where((r) => r.url.path == '/agent/layout'), hasLength(1));
+    expect(log.where((r) => r.url.path == '/agent/ephemera'), isEmpty);
+  });
+
+  testWidgets('building makes the decoration, saves it and places it', (
+    tester,
+  ) async {
+    final log = <http.Request>[];
+    final repository = await pumpBlend(tester, log);
+    await tester.enterText(find.byType(TextField), 'slow sunday');
+    await tester.tap(find.text('Plan a page'));
+    await tester.pumpAndSettle();
+    const build = 'Build page with 2 scraps + 1 decoration';
+    await tester.ensureVisible(find.text(build));
+    await tester.pumpAndSettle();
+
+    final journal = await buildAndWait(tester, build, repository);
+
+    final sent =
+        jsonDecode(log.singleWhere((r) => r.url.path == '/agent/ephemera').body)
+            as Map<String, dynamic>;
+    expect(sent, {
+      'kind': 'stamp',
+      'prompt': 'coffee stamp',
+      'palette': ['#6B4F3A', '#E8DCC4'],
+    });
+    final saved = await tester.runAsync(
+      () => FileScrapRepository(Directory('${root.path}/archive')).getAll(),
+    );
+    final stamp = saved!.single;
+    expect(stamp.source, ScrapSource.generated);
+    expect(stamp.type, 'stamp');
+    expect(stamp.description, 'coffee stamp');
+    final placed = journal!.pages.last.elements.where(
+      (e) => e.kind == ElementKind.scrap,
+    );
+    expect(placed.map((e) => e.scrapId), containsAll(['r1', 't1', stamp.id]));
   });
 
   testWidgets('if the designer fails, Build still makes a simple page', (
@@ -227,23 +327,15 @@ void main() {
     await tester.enterText(find.byType(TextField), 'slow sunday');
     await tester.tap(find.text('Plan a page'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Build page with 2 scraps'));
+    const build = 'Build page with 2 scraps + 1 decoration';
+    await tester.ensureVisible(find.text(build));
     await tester.pumpAndSettle();
 
-    final journal = await tester.runAsync(() async {
-      await tester.tap(find.text('Build page with 2 scraps'));
-      for (var i = 0; i < 100; i++) {
-        await tester.pump();
-        final j = (await repository.getAll()).single;
-        if (j.pages.length == 2) return j;
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
-      return null;
-    });
+    final journal = await buildAndWait(tester, build, repository);
 
     final scraps = journal!.pages.last.elements.where(
       (e) => e.kind == ElementKind.scrap,
     );
-    expect(scraps, hasLength(2)); // simple cascade
+    expect(scraps, hasLength(3)); // simple cascade, decoration included
   });
 }

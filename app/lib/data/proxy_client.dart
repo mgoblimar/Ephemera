@@ -152,6 +152,29 @@ class ProxyClient {
     }, timeout: _agentTimeout);
   }
 
+  /// Muse Image makes one decoration for a plan (~₱0.64), returned cut out.
+  Future<GeneratedEphemera> generateEphemera({
+    required String kind,
+    required String prompt,
+    List<String> palette = const [],
+  }) async {
+    final data = await _postJson('/agent/ephemera', {
+      'kind': kind,
+      'prompt': prompt.length > 300 ? prompt.substring(0, 300) : prompt,
+      'palette': palette.take(6).toList(),
+    }, timeout: _slowRequestTimeout);
+    return GeneratedEphemera(
+      kind: data['kind'] as String,
+      prompt: prompt,
+      png: base64Decode(data['png_base64'] as String),
+      width: data['width'] as int,
+      height: data['height'] as int,
+      palette: List.unmodifiable(
+        (data['palette'] as List<dynamic>? ?? const []).cast<String>(),
+      ),
+    );
+  }
+
   /// Muse Spark reads a scrap: OCR text, entities, tags, mood, description.
   Future<Map<String, dynamic>> enrich(Uint8List scrapPng) async {
     final request = http.MultipartRequest('POST', _uri('/enrich'))

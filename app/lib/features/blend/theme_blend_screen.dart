@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:ephemera_ai/config.dart';
 import 'package:ephemera_ai/data/proxy_client.dart';
 import 'package:ephemera_ai/features/blend/agent_layout.dart';
 import 'package:ephemera_ai/features/blend/simple_layout.dart';
@@ -39,8 +40,13 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
   final _theme = TextEditingController();
   BlendPlan? _plan;
   Set<String> _dropped = const {};
+
+  /// Indexes of the plan's decorations the user turned off.
+  Set<int> _skippedDecorations = const {};
   bool _planning = false;
-  bool _building = false;
+
+  /// What Build is doing right now, or null when idle.
+  String? _buildStep;
   String? _error;
   int _progress = 0;
   Timer? _ticker;
@@ -87,6 +93,7 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
       setState(() {
         _plan = plan;
         _dropped = const {};
+        _skippedDecorations = const {};
         if (plan.scraps.isEmpty) {
           _error = 'No scraps matched that theme. Try other words.';
         }
@@ -104,7 +111,19 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
       for (final s in plan.scraps)
         if (!_dropped.contains(s.id) && byId[s.id] != null) byId[s.id]!,
     ];
-    setState(() => _building = true);
+    final decorations = [
+      for (final (i, e) in plan.ephemera.indexed)
+        if (!_skippedDecorations.contains(i)) e,
+    ];
+    if (decorations.isNotEmpty) {
+      setState(
+        () => _buildStep =
+            'Making ${decorations.length} decoration${decorations.length == 1 ? '' : 's'}…',
+      );
+      scraps.addAll(await _makeDecorations(plan, decorations));
+      if (!mounted) return;
+    }
+    setState(() => _buildStep = 'Arranging your page…');
     final page = await _arrange(plan, scraps);
     if (!mounted) return;
     final journal = widget.journal.withPages([...widget.journal.pages, page]);
@@ -114,7 +133,7 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
     } on FileSystemException {
       if (mounted) {
         setState(() {
-          _building = false;
+          _buildStep = null;
           _error = "Couldn't save the new page. Check free storage.";
         });
       }
@@ -122,7 +141,7 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
     }
     ref.invalidate(journalsProvider);
     if (!mounted) return;
-    setState(() => _building = false);
+    setState(() => _buildStep = null);
     unawaited(
       Navigator.pushReplacement(
         context,
@@ -131,6 +150,43 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
         ),
       ),
     );
+  }
+
+  /// Muse Image makes the decorations side by side; each one is saved to the
+  /// archive. One that fails is skipped (and counted) so the page still builds.
+  Future<List<Scrap>> _makeDecorations(
+    BlendPlan plan,
+    List<({String kind, String prompt})> decorations,
+  ) async {
+    final proxy = ref.read(proxyClientProvider);
+    final repository = await ref.read(scrapRepositoryProvider.future);
+    final results = await Future.wait([
+      for (final d in decorations)
+        proxy
+            .generateEphemera(
+              kind: d.kind,
+              prompt: d.prompt,
+              palette: plan.palette,
+            )
+            .then<Scrap?>(repository.saveGenerated)
+            .catchError(
+              (Object _) => null,
+              test: (e) => e is ProxyException || e is FileSystemException,
+            ),
+    ]);
+    ref.invalidate(scrapsProvider);
+    final made = results.whereType<Scrap>().toList();
+    final failed = decorations.length - made.length;
+    if (failed > 0 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "$failed decoration${failed == 1 ? '' : 's'} couldn't be made; built without ${failed == 1 ? 'it' : 'them'}.",
+          ),
+        ),
+      );
+    }
+    return made;
   }
 
   /// The agent arranges the page; if that fails, the simple cascade keeps
@@ -221,7 +277,15 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
                         : {..._dropped, id},
                   );
                 }),
-                building: _building,
+                skippedDecorations: _skippedDecorations,
+                onToggleDecoration: (i) => setState(() {
+                  _skippedDecorations = Set.unmodifiable(
+                    _skippedDecorations.contains(i)
+                        ? (Set.of(_skippedDecorations)..remove(i))
+                        : {..._skippedDecorations, i},
+                  );
+                }),
+                buildStep: _buildStep,
                 onBuild: () => _build(plan, byId),
               ),
           ],
@@ -265,11 +329,17 @@ class PlanCards extends StatelessWidget {
     required this.dropped,
     required this.onToggle,
     required this.onBuild,
-    this.building = false,
+    this.skippedDecorations = const {},
+    this.onToggleDecoration,
+    this.buildStep,
   });
 
   final BlendPlan plan;
-  final bool building;
+
+  /// What Build is doing (shown on the button), or null when idle.
+  final String? buildStep;
+  final Set<int> skippedDecorations;
+  final ValueChanged<int>? onToggleDecoration;
   final Map<String, Scrap> byId;
   final Set<String> dropped;
   final ValueChanged<String> onToggle;
@@ -279,6 +349,8 @@ class PlanCards extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     final kept = plan.scraps.where((s) => !dropped.contains(s.id)).length;
+    final decorations = plan.ephemera.length - skippedDecorations.length;
+    final building = buildStep != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -319,9 +391,22 @@ class PlanCards extends StatelessWidget {
             Text('“$caption”', style: tokens.hand(24)),
         ],
         if (plan.ephemera.isNotEmpty) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          Text('Decorations to make', style: tokens.display(18)),
+          const SizedBox(height: 8),
+          for (final (i, e) in plan.ephemera.indexed)
+            DecorationRow(
+              kind: e.kind,
+              prompt: e.prompt,
+              kept: !skippedDecorations.contains(i),
+              onTap: onToggleDecoration == null
+                  ? null
+                  : () => onToggleDecoration!(i),
+            ),
           Text(
-            'Decorations to generate next: ${plan.ephemera.map((e) => e.kind).join(', ')}',
+            decorations == 0
+                ? 'No decorations: nothing extra to pay'
+                : '$decorations decoration${decorations == 1 ? '' : 's'} · ≈₱${(decorations * decorationCostPesos).toStringAsFixed(2)}',
             style: TextStyle(color: tokens.inkSoft),
           ),
         ],
@@ -331,9 +416,9 @@ class PlanCards extends StatelessWidget {
           child: FilledButton(
             onPressed: kept == 0 || building ? null : onBuild,
             child: Text(
-              building
-                  ? 'Arranging your page…'
-                  : 'Build page with $kept scrap${kept == 1 ? '' : 's'}',
+              buildStep ??
+                  'Build page with $kept scrap${kept == 1 ? '' : 's'}'
+                      '${decorations > 0 ? ' + $decorations decoration${decorations == 1 ? '' : 's'}' : ''}',
             ),
           ),
         ),
@@ -392,6 +477,87 @@ class _PlanScrapRow extends StatelessWidget {
                     child: Text(
                       reason.isEmpty ? (scrap?.type ?? 'scrap') : reason,
                       style: TextStyle(color: tokens.ink),
+                    ),
+                  ),
+                  Icon(
+                    kept ? Icons.check_circle : Icons.circle_outlined,
+                    color: kept ? tokens.accent : tokens.inkSoft,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One decoration the agent wants made: its kind, the prompt, and a toggle.
+class DecorationRow extends StatelessWidget {
+  const DecorationRow({
+    super.key,
+    required this.kind,
+    required this.prompt,
+    required this.kept,
+    this.onTap,
+  });
+
+  static const _icons = {
+    'stamp': Icons.local_post_office_outlined,
+    'tape': Icons.straighten,
+    'label': Icons.label_outline,
+    'ticket': Icons.confirmation_number_outlined,
+    'sticker': Icons.star_outline,
+  };
+
+  final String kind;
+  final String prompt;
+  final bool kept;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: tokens.surface,
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(tokens.cardRadius),
+          onTap: onTap,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: kept ? 1 : 0.4,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    _icons[kind] ?? Icons.auto_awesome,
+                    color: tokens.secondary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '$kind  ',
+                            style: TextStyle(
+                              color: tokens.ink,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          TextSpan(
+                            text: prompt,
+                            style: TextStyle(color: tokens.inkSoft),
+                          ),
+                        ],
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Icon(

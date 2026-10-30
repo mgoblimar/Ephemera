@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 /// The Theme Blend agent's plan for one page (SPEC 4.6), shown for approval.
 class BlendPlan {
   const BlendPlan({
@@ -51,4 +53,23 @@ class BlendPlan {
       toolCalls: json['tool_calls'] as int? ?? 0,
     );
   }
+}
+
+/// A decoration the image model made for a plan, already cut out.
+class GeneratedEphemera {
+  const GeneratedEphemera({
+    required this.kind,
+    required this.prompt,
+    required this.png,
+    required this.width,
+    required this.height,
+    required this.palette,
+  });
+
+  final String kind;
+  final String prompt;
+  final Uint8List png;
+  final int width;
+  final int height;
+  final List<String> palette;
 }
