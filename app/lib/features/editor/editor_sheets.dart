@@ -79,24 +79,34 @@ class _ScrapPickerSheet extends ConsumerWidget {
 
 typedef TextChoice = ({String text, String font});
 
-/// Dialog for writing (or editing) a handwritten caption.
+/// Dialog for writing (or editing) a handwritten caption. [ideas] are offered
+/// as one-tap suggestions (caption ideas from the scraps on the page).
 Future<TextChoice?> editText(
   BuildContext context, {
   String initialText = '',
   String initialFont = 'Caveat',
+  List<String> ideas = const [],
 }) {
   return showDialog<TextChoice>(
     context: context,
-    builder: (_) =>
-        _TextDialog(initialText: initialText, initialFont: initialFont),
+    builder: (_) => _TextDialog(
+      initialText: initialText,
+      initialFont: initialFont,
+      ideas: ideas,
+    ),
   );
 }
 
 class _TextDialog extends StatefulWidget {
-  const _TextDialog({required this.initialText, required this.initialFont});
+  const _TextDialog({
+    required this.initialText,
+    required this.initialFont,
+    this.ideas = const [],
+  });
 
   final String initialText;
   final String initialFont;
+  final List<String> ideas;
 
   @override
   State<_TextDialog> createState() => _TextDialogState();
@@ -127,6 +137,8 @@ class _TextDialogState extends State<_TextDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      // Scrolls when the keyboard leaves little room (landscape tablet).
+      scrollable: true,
       title: const Text('Caption'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -142,6 +154,31 @@ class _TextDialogState extends State<_TextDialog> {
               errorText: _error,
             ),
           ),
+          if (widget.ideas.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Ideas from your scraps',
+                style: TextStyle(color: context.tokens.inkSoft, fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final idea in widget.ideas)
+                  ActionChip(
+                    label: Text(idea, style: handwriting(_font, fontSize: 16)),
+                    onPressed: () => setState(() {
+                      _controller.text = idea;
+                      _error = null;
+                    }),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,

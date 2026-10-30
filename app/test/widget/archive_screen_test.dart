@@ -52,6 +52,14 @@ class _MemoryArchive implements ScrapRepository {
   Future<void> restore(Scrap scrap) async => _scraps.add(scrap);
 
   @override
+  Future<bool> modify(String id, Scrap Function(Scrap) change) async {
+    final i = _scraps.indexWhere((s) => s.id == id);
+    if (i < 0) return false;
+    _scraps[i] = change(_scraps[i]);
+    return true;
+  }
+
+  @override
   Future<void> update(Scrap scrap) async {
     final i = _scraps.indexWhere((s) => s.id == scrap.id);
     if (i >= 0) _scraps[i] = scrap;

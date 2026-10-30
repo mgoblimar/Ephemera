@@ -24,6 +24,11 @@ abstract interface class ScrapRepository {
   /// Replaces a stored scrap's metadata (e.g. after enrichment).
   Future<void> update(Scrap scrap);
 
+  /// Applies [change] to the stored copy of a scrap in one queued step, so
+  /// two writers (enrichment, a status change) can't undo each other.
+  /// Returns false if the scrap is gone.
+  Future<bool> modify(String id, Scrap Function(Scrap) change);
+
   /// Takes a scrap out of the archive. Its image file stays, so journal pages
   /// that already use it keep showing it, and [restore] can undo the removal.
   Future<void> remove(String id);
@@ -164,6 +169,18 @@ class FileScrapRepository implements ScrapRepository {
       for (final s in all) s['id'] == scrap.id ? scrap.toJson() : s,
     ]);
   });
+
+  @override
+  Future<bool> modify(String id, Scrap Function(Scrap) change) =>
+      _serially(() async {
+        final all = await _readList(_scrapIndex);
+        if (!all.any((s) => s['id'] == id)) return false;
+        await _writeList(_scrapIndex, [
+          for (final s in all)
+            s['id'] == id ? change(Scrap.fromJson(s)).toJson() : s,
+        ]);
+        return true;
+      });
 
   @override
   Future<void> remove(String id) => _serially(() async {

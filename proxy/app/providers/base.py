@@ -50,6 +50,8 @@ class Enrichment:
     tags: tuple[str, ...]
     mood: tuple[str, ...]
     description: str
+    journal_prompt: str = ""  # a question inviting the owner to write about it
+    captions: tuple[str, ...] = ()  # short caption ideas for a page
 
 
 class SegmentationProvider(Protocol):

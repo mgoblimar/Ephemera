@@ -48,3 +48,21 @@ def test_transparent_scraps_are_sent_on_white() -> None:
     assert sent[0].getpixel((0, 0)) == (255, 255, 255)
     assert sent[0].getpixel((5, 5)) == (200, 0, 0)
     assert on_white(Image.new("RGB", (2, 2))).mode == "RGB"
+
+
+def test_reads_the_journal_prompt_and_trims_captions() -> None:
+    reply = (
+        '{"type": "receipt", "journal_prompt": "Who did you share this coffee with?",'
+        ' "captions": ["two flat whites", "", 7, "' + "x" * 200 + '", "a third one"]}'
+    )
+
+    result = parse_enrichment(reply)
+
+    assert result.journal_prompt == "Who did you share this coffee with?"
+    assert result.captions == ("two flat whites", "x" * 60)
+
+
+def test_older_replies_without_prompts_still_parse() -> None:
+    result = parse_enrichment('{"type": "ticket"}')
+
+    assert result.journal_prompt == "" and result.captions == ()

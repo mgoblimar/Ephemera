@@ -1,6 +1,7 @@
 """Muse Spark enrichment: read a scrap's text and context (SPEC 4.3).
 
-Returns OCR text, dates/places/times, tags, mood and a one-line description.
+Returns OCR text, dates/places/times, tags, mood, a one-line description, a journal
+prompt and two caption ideas (all from the same single call).
 The palette is computed locally (imaging.dominant_palette), not by the model.
 """
 
@@ -18,6 +19,9 @@ ENTITY_KEYS = ("date", "time", "place", "brand", "price")
 MAX_TAGS = 8
 MAX_MOODS = 4
 MAX_TEXT = 600
+MAX_CAPTIONS = 2
+MAX_CAPTION_CHARS = 60
+MAX_PROMPT_CHARS = 160
 
 SYSTEM_PROMPT = "You catalogue junk-journal scraps precisely and reply with JSON only."
 USER_PROMPT = f"""This is one cut-out scrap from someone's junk journal (ticket, receipt, wrapper, sticker, note, flower...).
@@ -27,7 +31,9 @@ Read it and describe it for their archive. Reply with only this JSON:
  "entities": {{"date": "YYYY-MM-DD", "time": "HH:MM", "place": "...", "brand": "...", "price": "..."}} (only keys you can read),
  "tags": up to {MAX_TAGS} short lowercase tags for searching (objects, colours, themes, e.g. "coffee", "yellow", "travel"),
  "mood": up to {MAX_MOODS} lowercase mood words (e.g. "cozy", "nostalgic", "playful"),
- "description": one short sentence about what it is and how it looks}}"""
+ "description": one short sentence about what it is and how it looks,
+ "journal_prompt": one short, warm question inviting them to write about the memory behind it (e.g. "Who did you share this coffee with?"),
+ "captions": {MAX_CAPTIONS} short handwritten-style captions (at most 6 words each) that could sit next to it on a page}}"""
 
 
 class SparkEnricher:
@@ -63,11 +69,19 @@ def parse_enrichment(reply: str) -> Enrichment:
         tags=_words(payload.get("tags"), MAX_TAGS),
         mood=_words(payload.get("mood"), MAX_MOODS),
         description=_text(payload.get("description"))[:MAX_TEXT],
+        journal_prompt=_text(payload.get("journal_prompt"))[:MAX_PROMPT_CHARS],
+        captions=tuple(
+            c[:MAX_CAPTION_CHARS] for c in (_text(v) for v in _list(payload.get("captions"))) if c
+        )[:MAX_CAPTIONS],
     )
 
 
 def _text(value: object) -> str:
     return value.strip() if isinstance(value, str) else ""
+
+
+def _list(value: object) -> list[object]:
+    return value if isinstance(value, list) else []
 
 
 def _words(value: object, limit: int) -> tuple[str, ...]:

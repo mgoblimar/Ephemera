@@ -60,8 +60,8 @@ class EnrichmentService {
   Future<bool> _enrichOne(ScrapRepository repository, Scrap scrap) async {
     try {
       final data = await _proxy.enrich(await File(scrap.pngPath).readAsBytes());
-      await repository.update(applyEnrichment(scrap, data));
-      return true;
+      // Merged into the stored copy: the user may have changed it meanwhile.
+      return repository.modify(scrap.id, (s) => applyEnrichment(s, data));
     } on ProxyException {
       return false; // network or model trouble: retry on the next run
     } on FileSystemException {
@@ -84,6 +84,8 @@ Scrap applyEnrichment(Scrap scrap, Map<String, dynamic> data) {
     tags: strings(data['tags']),
     mood: strings(data['mood']),
     description: data['description'] as String? ?? '',
+    journalPrompt: data['journal_prompt'] as String? ?? '',
+    captions: strings(data['captions']),
     palette: palette.isEmpty ? scrap.palette : palette,
     entities: Map.unmodifiable(
       (data['entities'] as Map<String, dynamic>? ?? const {}).map(

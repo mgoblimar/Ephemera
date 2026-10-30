@@ -42,7 +42,7 @@ With 7 days left, the scope is tiered so that each tier is demoable on its own.
 | **P1** | Freehand drawing | Simple pen strokes |
 | **P1** | **UI/UX polish pass** (4.8) | The demo video is judged on looks: style, motion, empty states, app icon |
 | **P2** | Agent `generate_ephemera` tool (Muse Image) | ✅ Built Oct 30 as a Build step: plan lists up to 4 decorations (toggle each, ₱0.64 each), Build makes them in parallel, lifts them off the white background, saves them as `generated` scraps and lays them out with the rest |
-| **P2** | Journal prompts & captions | Reuses the enrichment call; cheap if OCR works |
+| **P2** | Journal prompts & captions | ✅ Built Oct 31: the same enrichment call also returns a journal prompt (shown in the scrap sheet) and 2 caption ideas (offered in the editor's Text dialog for scraps on the page); no extra cost |
 | **Stretch** | Import an existing physical journal: **Style Profile only** | One Muse Spark call over page photos, fed to the agent |
 | Post-hackathon | Journal import: re-extract scraps + read-only digital copy | Kept in the spec (4.7) as the roadmap |
 | Post-hackathon | Cloud sync + accounts | |
@@ -475,11 +475,11 @@ Page state is immutable: every edit produces a new `Page` value, which keeps und
 ## 7. Demo Script (≈3 min)
 
 1. **Hook (15 s):** a messy desk of tickets, a café receipt, pressed flowers and washi tape. "Digitizing this used to take an hour."
-2. **Snap → Cutout (40 s):** take the photo, SAM 3.1 auto-detects every item, tap to add the one it missed, save. Zoom in on a deckle edge and the translucent tape.
-3. **Archive + OCR (20 s):** the receipt shows its date, place and tags; a journal prompt is suggested.
-4. **Theme Blend Agent (60 s):** type "slow Sunday café morning, warm browns" and pin the receipt. Show the streamed plan with chosen scraps, a palette and (if P2 shipped) two generated stamps. Remove one scrap, approve, and the page builds itself.
+2. **Snap → Cutout (40 s):** scan two or three photos; Muse Spark finds every piece (shimmer over the photo). Look closer at a wrapper and **Split** it into its logo and character, untick a piece you don't want, then **Cut & save** once (one SAM request, ₱0.16) and watch the scraps drop in. Zoom in on a torn edge on the archive wall.
+3. **Archive + OCR (20 s):** filter the wall by a vibe, open the receipt: Muse Spark read its text, date, place and tags, and suggests a **journal prompt** ("What did you order?"). In the editor, **Text** offers caption ideas from the scraps on the page.
+4. **Theme Blend Agent (60 s):** type "slow Sunday café morning, warm browns". Show the plan with chosen scraps, a palette, captions and the decorations it will make (with their cost). Drop one scrap, Build: Muse Image makes the stamps and tape, and the agent lays out the page.
 5. **Edit + Book (30 s):** nudge a scrap, add a handwritten caption, doodle, close the page, and flip through the book.
-6. **(Stretch bonus, 15 s, only if it shipped):** import a photo of an old physical journal page and show the extracted Style Profile and "Match my style."
+6. ~~(Stretch bonus: journal import / Style Profile)~~ not built; instead (15 s): switch to the **Cozy cat** theme to show the app restyle.
 7. **Close (10 s):** Meta models used, and what's next (aging effects, cloud sync).
 
 ## 8. Milestones (7-day plan)
@@ -492,7 +492,7 @@ Solo build: features are built **vertically** (app screen + its proxy endpoint t
 | **2** ✅ | Done: real SAM 3.1 + Muse Spark (Plan A chosen); sticker sheets split per sticker; full-resolution cutouts, hole filling, speck removal, scrap types; **scan session with contact-sheet batching** (16 pieces per ₱0.16 request); element detection proven live | ✅ Real cutouts on the tablet; 62 proxy + 19 app tests pass |
 | **3** ✅ | Done: canvas editor (drag/pinch/rotate, layers, handwriting text, paper styles, undo/redo, autosave, PNG export) + journal library + book with 3D page turn; Split built (quality in backlog) | ✅ **Cut line passed on the tablet** (Oct 30): scan → cut → collage → page flips; 65 proxy + 34 app tests |
 | **4** ✅ | Done: theme system (Desk tokens); real Muse Spark enrichment in the background (50/50 scraps, 0 failures); Theme Blend plan step (Responses API, `search_archive`, plan cards, Build page with a simple cascade); split-from data | ✅ Live on the tablet (Oct 30): a theme gave a 6-scrap plan in ~19 s with 4 searches; page built. Simple cascade overlaps scraps, so the agent layout is Day 5 |
-| **5** | **Morning:** agent build (layout step + validation). **Afternoon:** UI/UX polish pass (4.8 A2–A6) including **archive filters (4.2)**, then the Cozy cat theme if time. P2 (`generate_ephemera`, freehand, prompts) only if both are done. **Feature freeze tonight** | Agent builds a page end-to-end; every demo screen polished; demo assets cached |
+| **5** ✅ | Done early (Oct 30–31, on the emulator): agent layout step (Wonder, ~32 s/page); UI/UX polish (archive wall + filters incl. status / made-by, cloth covers, editor handles, scan motion, icon + splash); **Cozy cat** theme; scan tuning; P2 **generated decorations**, **freehand drawing**, **journal prompts + caption ideas**; junk control. Still to do before freeze: test all of it on the tablet, switch Spark to the standard model, cache demo assets. **Feature freeze Nov 2** | Agent builds a page end-to-end on the emulator; tablet check pending |
 | **6** | **Demo video day:** script (section 7), record, edit. Fix only bugs that show up on camera. README with setup steps and a list of the Meta models used | Final video exported |
 | **7** | **Submission & social:** submit the repo + video, post on social media (cut a 30–60 s vertical clip from the video) | Submitted |
 

@@ -9,6 +9,7 @@ import 'package:ephemera_ai/features/editor/editor_screen.dart';
 import 'package:ephemera_ai/features/editor/handwriting.dart';
 import 'package:ephemera_ai/features/editor/strokes.dart';
 import 'package:ephemera_ai/models/journal.dart';
+import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/providers.dart';
 
 void main() {
@@ -28,6 +29,7 @@ void main() {
       ProviderScope(
         overrides: [
           journalRepositoryProvider.overrideWith((ref) async => repository),
+          scrapsProvider.overrideWith((ref) async => const <Scrap>[]),
         ],
         child: MaterialApp(
           home: EditorScreen(journal: journal, pageId: journal.pages.single.id),
@@ -152,6 +154,58 @@ void main() {
     await tester.tap(find.byTooltip('Undo'));
     await tester.pumpAndSettle();
     expect(colorOf(), before);
+  });
+
+  testWidgets('Text offers caption ideas from the scraps on the page', (
+    tester,
+  ) async {
+    final created = (await tester.runAsync(() => repository.create('Cafe')))!;
+    final page = created.pages.single.adding(
+      const PageElement(
+        id: 'e1',
+        kind: ElementKind.scrap,
+        cx: 0.5,
+        cy: 0.4,
+        size: 0.4,
+        scrapId: 'r1',
+        imagePath: '/missing/r1.png',
+      ),
+    );
+    final journal = created.replacingPage(page);
+    final receipt = Scrap(
+      id: 'r1',
+      pngPath: '/missing/r1.png',
+      width: 100,
+      height: 100,
+      source: ScrapSource.capture,
+      createdAt: DateTime(2026, 10, 31),
+      captions: const ['two flat whites, no rush'],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          journalRepositoryProvider.overrideWith((ref) async => repository),
+          scrapsProvider.overrideWith((ref) async => [receipt]),
+        ],
+        child: MaterialApp(
+          home: EditorScreen(journal: journal, pageId: page.id),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Text'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ideas from your scraps'), findsOneWidget);
+    await tester.tap(find.text('two flat whites, no rush'));
+    await tester.pump();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('two flat whites, no rush'),
+      findsOneWidget,
+    ); // on the page
   });
 
   testWidgets('delete removes the selected element; undo restores it', (

@@ -89,4 +89,6 @@ class MockVisionLLMProvider:
             tags=("coffee", "morning", "cafe"),
             mood=("cozy", "quiet"),
             description="Faded thermal café receipt with a coffee ring (mock enrichment)",
+            journal_prompt="Who did you share this coffee with?",
+            captions=("two flat whites, no rush", "9:42, still sleepy"),
         )

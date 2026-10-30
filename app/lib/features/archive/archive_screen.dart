@@ -108,10 +108,9 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
 
   Future<void> _setStatus(Scrap scrap, PhysicalStatus status) async {
     final repository = await ref.read(scrapRepositoryProvider.future);
-    // Re-read so a background enrichment that landed meanwhile isn't undone.
-    final latest = (await repository.getAll()).where((s) => s.id == scrap.id);
-    await repository.update(
-      (latest.firstOrNull ?? scrap).copyWith(physicalStatus: status),
+    await repository.modify(
+      scrap.id,
+      (s) => s.copyWith(physicalStatus: status),
     );
     ref.invalidate(scrapsProvider);
   }

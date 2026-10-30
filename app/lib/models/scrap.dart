@@ -48,6 +48,8 @@ class Scrap {
     this.splitFromLabel,
     this.parentScrapId,
     this.physicalStatus = PhysicalStatus.available,
+    this.journalPrompt = '',
+    this.captions = const [],
   });
 
   final String id;
@@ -75,6 +77,12 @@ class Scrap {
   final String? parentScrapId;
   final PhysicalStatus physicalStatus;
 
+  /// From enrichment: a question that invites writing about the memory.
+  final String journalPrompt;
+
+  /// From enrichment: short caption ideas for a page.
+  final List<String> captions;
+
   bool get isSplitElement => splitFromLabel != null;
 
   /// Too small or thin to look good on a page (side text, specks of a badge),
@@ -98,6 +106,8 @@ class Scrap {
     bool? enriched,
     Map<String, String>? entities,
     PhysicalStatus? physicalStatus,
+    String? journalPrompt,
+    List<String>? captions,
   }) {
     return Scrap(
       id: id,
@@ -118,6 +128,8 @@ class Scrap {
       splitFromLabel: splitFromLabel,
       parentScrapId: parentScrapId,
       physicalStatus: physicalStatus ?? this.physicalStatus,
+      journalPrompt: journalPrompt ?? this.journalPrompt,
+      captions: captions ?? this.captions,
     );
   }
 
@@ -140,6 +152,8 @@ class Scrap {
     'split_from_label': splitFromLabel,
     'parent_scrap_id': parentScrapId,
     'physical_status': physicalStatus.name,
+    'journal_prompt': journalPrompt,
+    'captions': captions,
   };
 
   factory Scrap.fromJson(Map<String, dynamic> json) {
@@ -168,6 +182,8 @@ class Scrap {
       physicalStatus:
           PhysicalStatus.values.asNameMap()[json['physical_status']] ??
           PhysicalStatus.available,
+      journalPrompt: json['journal_prompt'] as String? ?? '',
+      captions: _strings(json['captions']),
     );
   }
 }

@@ -26,6 +26,7 @@ const _newTextSize = 0.07;
 const _maxTilt = 0.12; // radians; a slight hand-placed tilt
 const _duplicateOffset = 0.04;
 const _exportPixelRatio = 3.0;
+const _maxCaptionIdeas = 6;
 
 /// Edits one page of a journal. Every finished change is one undo step and
 /// is saved straight away.
@@ -122,8 +123,25 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     setState(() => _selectedId = element.id);
   }
 
+  /// Caption ideas Muse Spark wrote for the scraps already on this page.
+  Future<List<String>> _captionIdeas() async {
+    final List<Scrap> archive;
+    try {
+      archive = await ref.read(scrapsProvider.future);
+    } on Exception {
+      return const []; // archive unreadable: just no ideas
+    }
+    final byId = {for (final s in archive) s.id: s};
+    return {
+      for (final e in _live.elements)
+        if (e.kind == ElementKind.scrap) ...?byId[e.scrapId]?.captions,
+    }.take(_maxCaptionIdeas).toList();
+  }
+
   Future<void> _addText() async {
-    final choice = await editText(context);
+    final ideas = await _captionIdeas();
+    if (!mounted) return;
+    final choice = await editText(context, ideas: ideas);
     if (choice == null || !mounted) return;
     final element = PageElement(
       id: _uuid.v4(),

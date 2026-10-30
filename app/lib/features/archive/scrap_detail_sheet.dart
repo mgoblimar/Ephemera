@@ -100,6 +100,10 @@ class _ScrapDetail extends StatelessWidget {
             style: TextStyle(color: tokens.ink, height: 1.4),
           ),
         ],
+        if (scrap.journalPrompt.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _JournalPrompt(prompt: scrap.journalPrompt),
+        ],
         if (scrap.ocrText.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(
@@ -211,6 +215,43 @@ class _StatusPickerState extends State<_StatusPicker> {
           style: TextStyle(color: tokens.inkSoft, fontSize: 13),
         ),
       ],
+    );
+  }
+}
+
+/// A writing prompt on a little lined card, like a journaling sticker.
+class _JournalPrompt extends StatelessWidget {
+  const _JournalPrompt({required this.prompt});
+
+  final String prompt;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      decoration: BoxDecoration(
+        color: tokens.surface,
+        borderRadius: BorderRadius.circular(tokens.cardRadius * 0.6),
+        border: Border(left: BorderSide(color: tokens.accent, width: 4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.edit_note, size: 18, color: tokens.accent),
+              const SizedBox(width: 6),
+              Text(
+                'Journal prompt',
+                style: TextStyle(color: tokens.inkSoft, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(prompt, style: tokens.hand(24)),
+        ],
+      ),
     );
   }
 }

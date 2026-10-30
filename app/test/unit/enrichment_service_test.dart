@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:ephemera_ai/data/enrichment_service.dart';
 import 'package:ephemera_ai/data/proxy_client.dart';
 import 'package:ephemera_ai/data/scrap_repository.dart';
+import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/models/segmentation.dart';
 
 import '../fakes.dart';
@@ -107,5 +108,34 @@ void main() {
     final all = await repository.getAll();
     expect(all, hasLength(3));
     expect(all.firstWhere((s) => s.id == first.single.id).tags, ['updated']);
+  });
+
+  test('saves the journal prompt and captions, and keeps a status set '
+      'while it was being read', () async {
+    final saved = await repository.saveCapture(
+      photoJpeg: Uint8List(1),
+      cutouts: [_cutout('a')],
+    );
+    final client = fakeProxy((_) {
+      // The user marks it as used while Muse Spark is still reading it.
+      repository.update(
+        saved.single.copyWith(physicalStatus: PhysicalStatus.used),
+      );
+      return okEnvelope({
+        'type': 'receipt',
+        'journal_prompt': 'Who did you share this coffee with?',
+        'captions': ['two flat whites', '9:42, still sleepy'],
+      });
+    });
+
+    await service(client).enrichPending();
+
+    final scrap = (await repository.getAll()).single;
+    expect(scrap.journalPrompt, 'Who did you share this coffee with?');
+    expect(scrap.captions, ['two flat whites', '9:42, still sleepy']);
+    expect(scrap.physicalStatus, PhysicalStatus.used);
+    final reloaded = Scrap.fromJson(scrap.toJson());
+    expect(reloaded.journalPrompt, scrap.journalPrompt);
+    expect(reloaded.captions, scrap.captions);
   });
 }
