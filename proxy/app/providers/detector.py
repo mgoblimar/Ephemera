@@ -54,7 +54,8 @@ ELEMENT_PROMPT = f"""This is a close-up of one junk-journal scrap (a wrapper, ti
 List the printed design elements on it that a journaler could cut out and use on their own as a
 sticker: logos, words or lettering, illustrations, badges or labels, characters, decorative motifs.
 - Each element is one visually self-contained shape; keep a logo with its own outline/frame.
-- Skip plain background, fine print, barcodes, nutrition facts and anything covering most of the scrap.
+- Always include the main illustration or product picture if there is one, even when it is large.
+- Skip plain background, fine print, paragraphs of small text, barcodes and nutrition facts.
 For each element give:
 - "label": one of {", ".join(ELEMENT_TYPES)}
 - "box": [x1, y1, x2, y2], the tight bounding box on a 0-{COORDINATE_SCALE} grid where (0,0) is the

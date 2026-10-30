@@ -29,6 +29,8 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
   CutStyle _style = CutStyle.tight;
   CutSize _size = CutSize.m;
   bool _cutting = false;
+  Set<String> _splitting = const {};
+  Set<String> _alreadySplit = const {};
   int _nextKey = 0;
 
   ProxyClient get _proxy => ref.read(proxyClientProvider);
@@ -97,6 +99,37 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
         for (final p in _photos) p.key == updated.key ? updated : p,
       ]);
     });
+  }
+
+  /// Asks Spark for the design elements inside [piece]; they arrive chosen.
+  Future<void> _split(SessionPhoto photo, ScanPiece piece) async {
+    setState(() => _splitting = Set.unmodifiable({..._splitting, piece.key}));
+    try {
+      final elements = await _proxy.scanSplit(piece);
+      if (!mounted) return;
+      final current = _photos.firstWhere((p) => p.key == photo.key);
+      final scan = current.scan;
+      if (scan != null) {
+        _replace(current.withScan(scan.withElements(piece.id, elements)));
+      }
+      setState(() {
+        _alreadySplit = Set.unmodifiable({..._alreadySplit, piece.key});
+        _chosen = Set.unmodifiable({..._chosen, ...elements.map((e) => e.key)});
+      });
+      if (elements.isEmpty) {
+        _showMessage('No separate designs found on this piece.');
+      }
+    } on ProxyException catch (e) {
+      _showMessage(e.message);
+    } finally {
+      if (mounted) {
+        setState(
+          () => _splitting = Set.unmodifiable(
+            Set.of(_splitting)..remove(piece.key),
+          ),
+        );
+      }
+    }
   }
 
   void _toggle(ScanPiece piece) {
@@ -196,6 +229,9 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
                             onChooseAll: (all) => _chooseAll(photo, all),
                             onRetry: () => _retry(photo),
                             onRemove: () => _remove(photo),
+                            splitting: _splitting,
+                            alreadySplit: _alreadySplit,
+                            onSplit: (piece) => _split(photo, piece),
                           ),
                       ],
                     ),

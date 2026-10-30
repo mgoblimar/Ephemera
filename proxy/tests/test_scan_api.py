@@ -57,6 +57,42 @@ def test_cutouts_use_the_full_resolution_photo(client: TestClient) -> None:
     assert scrap["width"] > piece["box"][2] * 1.8
 
 
+def test_split_returns_elements_inside_the_parent_piece(client: TestClient) -> None:
+    data = _detect(client, (3000, 2000))
+    parent = data["pieces"][1]
+
+    split = client.post("/scan/split", json={"image_id": data["image_id"], "piece_id": parent["id"]}).json()["data"]
+
+    assert split["parent_id"] == parent["id"]
+    assert [p["label"] for p in split["pieces"]] == ["logo", "lettering"]
+    px, py, pw, ph = parent["box"]
+    for element in split["pieces"]:
+        x, y, w, h = element["box"]
+        assert px <= x and py <= y and x + w <= px + pw + 1 and y + h <= py + ph + 1
+
+
+def test_whole_piece_and_its_elements_cut_in_one_request(client: TestClient) -> None:
+    data = _detect(client, (3000, 2000))
+    parent = data["pieces"][0]
+    split = client.post("/scan/split", json={"image_id": data["image_id"], "piece_id": parent["id"]}).json()["data"]
+    refs = [{"image_id": data["image_id"], "piece_id": p["id"]} for p in [parent, *split["pieces"]]]
+
+    cut = client.post("/scan/cut", json={"pieces": refs, "cut_style": "sticker"}).json()["data"]
+
+    assert cut["sam_requests"] == 1
+    assert [s["label"] for s in cut["scraps"]] == ["ticket", "logo", "lettering"]
+    whole, logo = cut["scraps"][0], cut["scraps"][1]
+    assert logo["width"] < whole["width"]
+
+
+def test_split_unknown_piece_is_404(client: TestClient) -> None:
+    data = _detect(client)
+
+    response = client.post("/scan/split", json={"image_id": data["image_id"], "piece_id": "nope"})
+
+    assert response.status_code == 404
+
+
 def test_unknown_piece_is_a_404_envelope(client: TestClient) -> None:
     data = _detect(client)
 

@@ -96,13 +96,24 @@ Measured: 14 pieces from 3 photos = 1 billed image (`images_processed=1`), same 
 
 The Day 1 review screen (tap-to-add, refine) is kept in the code but not reachable. Refinement is parked (see 4.1c).
 
-#### 4.1b Split into design elements (next: Day 3 morning)
+#### 4.1b Split into design elements (built Day 2; quality in backlog)
 
 A scrap often holds smaller designs worth cutting out on their own: the SUMO lettering on a wrapper, the oval logo on a paper bag, a character on a box. Sometimes the whole item is wanted, sometimes just a piece of it, sometimes both.
 
 - A **Split** button on each piece tile sends a close-up crop of that piece to Muse Spark (`detect_elements`, ~₱0.01). Spark returns elements labelled `logo · lettering · illustration · badge · character · pattern · photo`.
 - Elements appear as extra tiles under their parent. Any mix of whole items and elements is cut in the same batched request (16 per SAM call). Default cut style for elements: **Sticker**.
 - Live test (Day 2): Jamaican bag logo and pattie came out as clean die-cut stickers. Sumo lettering, badge and cookies were good after **speck removal** (`drop_islands` keeps parts ≥15% of the largest). The cream box missed its hero jar illustration, so the prompt needs "include the main illustration even if large".
+
+**Status (Day 2 evening): built, quality not good enough yet; moved to the backlog.** Tested live on 3 wrappers (15 elements, 2 SAM requests):
+- Good: logos and lettering with their own outline. The SUMO logo is clean after speck removal.
+- Poor: Spark's boxes are loose or overlap neighbours (a badge swallowed an adjacent cookie and background). Shapes printed on busy backgrounds (a milk splash) give vague regions.
+
+**Backlog ideas to improve it:**
+1. Ask Spark for tighter boxes and only "clear, self-contained" elements, and drop overlapping or huge boxes server-side.
+2. Run SAM per element with negative points on neighbouring elements, so they don't merge.
+3. Refinement taps (4.1c) for manual fixes.
+4. Edge snapping.
+5. Consider Muse Spark at higher reasoning effort (not contributor) for element boxes only.
 
 #### 4.1c Parked: refinement
 
@@ -404,7 +415,7 @@ Solo build: features are built **vertically** (app screen + its proxy endpoint t
 |---|---|---|
 | **1** ✅ | Done: Flutter app + FastAPI proxy with mocks; capture, mask review, tap-to-add, cut styles, save to the Archive (pulled forward from Day 2); Muse Wonder tool calling confirmed with the real key; SAM/pricing docs read | ✅ Mock hero flow works end to end; 25 proxy + 14 app tests pass |
 | **2** ✅ | Done: real SAM 3.1 + Muse Spark (Plan A chosen); sticker sheets split per sticker; full-resolution cutouts, hole filling, speck removal, scrap types; **scan session with contact-sheet batching** (16 pieces per ₱0.16 request); element detection proven live | ✅ Real cutouts on the tablet; 62 proxy + 19 app tests pass |
-| **3** | **Morning (~1 h):** Split button (4.1b) + hero-illustration prompt tweak. **Then:** canvas editor (transforms, layers, text, undo/redo, PNG export) + library and book flip (package) | **Cut-line check:** scan → cut → collage works on the tablet |
+| **3** | Canvas editor (transforms, layers, text, undo/redo, PNG export) + library and book flip (package) | **Cut-line check:** scan → cut → collage works on the tablet |
 | **4** | Enrichment (OCR + tags + palette) + agent plan with `search_archive`, SSE progress, plan cards UI | A theme prompt returns an approvable plan |
 | **5** | Agent build (layout step + validation). If on track: `generate_ephemera`, freehand, prompts (P2). **Feature freeze tonight** | Agent builds a page end-to-end; demo assets cached |
 | **6** | **Demo video day:** script (section 7), record, edit. Fix only bugs that show up on camera. README with setup steps and a list of the Meta models used | Final video exported |

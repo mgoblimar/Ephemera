@@ -124,6 +124,26 @@ class ProxyClient {
     );
   }
 
+  /// Find design elements (logos, lettering...) inside one whole piece.
+  Future<List<ScanPiece>> scanSplit(ScanPiece parent) async {
+    final data = await _postJson('/scan/split', {
+      'image_id': parent.imageId,
+      'piece_id': parent.id,
+    }, timeout: _slowRequestTimeout);
+    return List.unmodifiable(
+      (data['pieces'] as List<dynamic>).map((raw) {
+        final p = raw as Map<String, dynamic>;
+        return ScanPiece(
+          id: p['id'] as String,
+          imageId: parent.imageId,
+          label: p['label'] as String,
+          thumbJpeg: base64Decode(p['thumb_jpeg'] as String),
+          parentId: parent.id,
+        );
+      }),
+    );
+  }
+
   /// Cut the chosen pieces; the proxy packs up to 16 per SAM request.
   Future<ScanCutResult> scanCut({
     required List<ScanPiece> pieces,

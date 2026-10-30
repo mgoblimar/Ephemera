@@ -60,6 +60,11 @@ class RealSegmentationProvider:
     def segment_boxes(self, image: Image.Image, boxes: Sequence[PixelBox]) -> list[Mask | None]:
         return self._sam.segment_boxes(image, boxes)
 
+    def detect_elements(self, scrap: Image.Image) -> list[DetectedItem]:
+        elements = self._detector.detect_elements(scrap)
+        logger.info("Split found %d elements: %s", len(elements), [e.label for e in elements])
+        return elements
+
     def _detected_masks(self, image: Image.Image) -> list[Mask]:
         items = self._detector.detect(image)
         logger.info("Detector found %d items: %s", len(items), [i.label for i in items])

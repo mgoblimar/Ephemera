@@ -63,6 +63,14 @@ class MockSegmentationProvider:
             for b in boxes
         ]
 
+    def detect_elements(self, scrap: Image.Image) -> list[DetectedItem]:
+        """Two elements: a logo in the top half and lettering in the bottom half."""
+        width, height = scrap.size
+        return [
+            DetectedItem(label="logo", box=PixelBox(width // 10, height // 10, width // 2, height // 2)),
+            DetectedItem(label="lettering", box=PixelBox(width // 4, height * 3 // 5, width * 9 // 10, height * 9 // 10)),
+        ]
+
     def point_mask(self, image: Image.Image, points: Sequence[PointPrompt]) -> Mask:
         width, height = image.size
         positives = [p for p in points if p.positive] or list(points)

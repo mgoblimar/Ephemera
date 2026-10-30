@@ -62,6 +62,10 @@ class SegmentationProvider(Protocol):
         """Cut up to 16 boxes in one SAM request."""
         ...
 
+    def detect_elements(self, scrap: Image.Image) -> list[DetectedItem]:
+        """Design elements (logos, lettering, illustrations...) inside one scrap's crop."""
+        ...
+
 
 class VisionLLMProvider(Protocol):
     """Muse Spark."""

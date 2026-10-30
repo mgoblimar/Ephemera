@@ -9,12 +9,18 @@ class ScanPiece {
     required this.imageId,
     required this.label,
     required this.thumbJpeg,
+    this.parentId,
   });
 
   final String id;
   final String imageId;
   final String label;
   final Uint8List thumbJpeg;
+
+  /// Set for design elements split out of a whole piece.
+  final String? parentId;
+
+  bool get isElement => parentId != null;
 
   /// Unique across a whole scan session.
   String get key => '$imageId:$id';
@@ -25,6 +31,16 @@ class ScanPhoto {
 
   final String imageId;
   final List<ScanPiece> pieces;
+
+  /// Inserts [elements] right after their parent piece.
+  ScanPhoto withElements(String parentId, List<ScanPiece> elements) {
+    return ScanPhoto(
+      imageId: imageId,
+      pieces: List.unmodifiable([
+        for (final p in pieces) ...[p, if (p.id == parentId) ...elements],
+      ]),
+    );
+  }
 }
 
 class ScanCutResult {

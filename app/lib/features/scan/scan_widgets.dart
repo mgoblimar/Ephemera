@@ -37,11 +37,19 @@ class PhotoSection extends StatelessWidget {
     required this.onChooseAll,
     required this.onRetry,
     required this.onRemove,
+    required this.splitting,
+    required this.alreadySplit,
+    required this.onSplit,
   });
 
   final SessionPhoto photo;
   final Set<String> chosen;
   final ValueChanged<ScanPiece> onToggle;
+
+  /// Keys of whole pieces whose split is in progress / done.
+  final Set<String> splitting;
+  final Set<String> alreadySplit;
+  final ValueChanged<ScanPiece> onSplit;
   final ValueChanged<bool> onChooseAll;
   final VoidCallback onRetry;
   final VoidCallback onRemove;
@@ -69,7 +77,9 @@ class PhotoSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(child: _status(pieces.length)),
+              Expanded(
+                child: _status(pieces.where((p) => !p.isElement).length),
+              ),
               if (pieces.isNotEmpty)
                 TextButton(
                   onPressed: () => onChooseAll(!allChosen),
@@ -92,6 +102,10 @@ class PhotoSection extends StatelessWidget {
                   piece: piece,
                   chosen: chosen.contains(piece.key),
                   onTap: () => onToggle(piece),
+                  splitting: splitting.contains(piece.key),
+                  onSplit: piece.isElement || alreadySplit.contains(piece.key)
+                      ? null
+                      : () => onSplit(piece),
                 ),
             ],
           ),
@@ -141,71 +155,110 @@ class PieceTile extends StatelessWidget {
     required this.piece,
     required this.chosen,
     required this.onTap,
+    this.splitting = false,
+    this.onSplit,
   });
 
   final ScanPiece piece;
   final bool chosen;
   final VoidCallback onTap;
+  final bool splitting;
+
+  /// Null hides the Split action (elements, or pieces already split).
+  final VoidCallback? onSplit;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: '${piece.label}, ${chosen ? 'chosen' : 'not chosen'}',
-      button: true,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 150),
-          opacity: chosen ? 1 : 0.45,
-          child: Container(
-            width: _thumbSize,
-            decoration: BoxDecoration(
-              color: Palette.paperDeep,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: chosen ? Palette.terracotta : Colors.transparent,
-                width: 2,
-              ),
-            ),
-            child: Column(
-              children: [
-                Stack(
+    return Container(
+      width: _thumbSize,
+      decoration: BoxDecoration(
+        color: piece.isElement ? Palette.paper : Palette.paperDeep,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: chosen ? Palette.terracotta : Palette.paperDeep,
+          width: 2,
+        ),
+      ),
+      child: Column(
+        children: [
+          Semantics(
+            label: '${piece.label}, ${chosen ? 'chosen' : 'not chosen'}',
+            button: true,
+            child: GestureDetector(
+              onTap: onTap,
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 150),
+                opacity: chosen ? 1 : 0.45,
+                child: Column(
                   children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(4),
-                      ),
-                      child: Image.memory(
-                        piece.thumbJpeg,
-                        width: _thumbSize,
-                        height: _thumbSize - 20,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: Icon(
-                        chosen ? Icons.check_circle : Icons.circle_outlined,
-                        size: 20,
-                        color: chosen ? Palette.terracotta : Colors.white,
+                    _thumbWithCheck(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        piece.isElement ? '↳ ${piece.label}' : piece.label,
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Text(
-                    piece.label,
-                    style: const TextStyle(fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
+          if (splitting)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 6),
+              child: SizedBox.square(
+                dimension: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (onSplit != null)
+            InkWell(
+              onTap: onSplit,
+              child: const Padding(
+                padding: EdgeInsets.only(bottom: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.content_cut, size: 14, color: Palette.inkSoft),
+                    SizedBox(width: 4),
+                    Text(
+                      'Split',
+                      style: TextStyle(fontSize: 12, color: Palette.inkSoft),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
+    );
+  }
+
+  Widget _thumbWithCheck() {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+          child: Image.memory(
+            piece.thumbJpeg,
+            width: _thumbSize,
+            height: _thumbSize - 20,
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: Icon(
+            chosen ? Icons.check_circle : Icons.circle_outlined,
+            size: 20,
+            color: chosen ? Palette.terracotta : Colors.white,
+          ),
+        ),
+      ],
     );
   }
 }

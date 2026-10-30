@@ -22,6 +22,20 @@ http.Client _proxy(List<http.Request> log) {
     if (request.url.path == '/scan/detect') {
       return okEnvelope(scanDetectData('img${photoCount++}'));
     }
+    if (request.url.path == '/scan/split') {
+      return okEnvelope({
+        'parent_id': 'p0',
+        'pieces': [
+          for (final label in ['logo', 'lettering'])
+            {
+              'id': 'e-$label',
+              'label': label,
+              'box': [12, 12, 20, 20],
+              'thumb_jpeg': tinyPngBase64,
+            },
+        ],
+      });
+    }
     final body = jsonDecode(request.body) as Map<String, dynamic>;
     return okEnvelope(
       scanCutData((body['pieces'] as List).cast<Map<String, dynamic>>()),
@@ -114,6 +128,27 @@ void main() {
       expect(saved.every((s) => s.type == 'sticker'), isTrue);
     },
   );
+
+  testWidgets('split adds chosen element tiles that are cut with the rest', (
+    tester,
+  ) async {
+    final log = <http.Request>[];
+    await tester.pumpWidget(_app(_proxy(log), FileScrapRepository(root)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Split').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('↳ logo'), findsOneWidget);
+    expect(find.text('↳ lettering'), findsOneWidget);
+    expect(find.text('Cut & save 4'), findsOneWidget);
+    expect(
+      find.text('Split'),
+      findsOneWidget,
+    ); // only the unsplit piece keeps it
+    final split = log.singleWhere((r) => r.url.path == '/scan/split');
+    expect((jsonDecode(split.body) as Map)['piece_id'], 'p0');
+  });
 
   testWidgets('a failed scan shows the error with retry', (tester) async {
     final client = fakeProxy(

@@ -19,7 +19,7 @@ from app.envelope import ApiError, ok
 from app.image_store import ImageStore, StoredImage
 from app.imaging import CutSize, CutStyle, apply_cut_style, border_px, dominant_palette, jpeg_bytes, png_bytes
 from app.providers import Providers
-from app.providers.base import PixelBox
+from app.providers.base import DetectedItem, PixelBox
 from app.providers.sam import MAX_OBJECTS_PER_REQUEST
 from app.routes import deps
 
@@ -69,16 +69,80 @@ async def detect(
             "width": photo.width,
             "height": photo.height,
             "pieces": [
-                {
-                    "id": piece_id,
-                    "label": item.label,
-                    "box": [item.box.left, item.box.top, item.box.right - item.box.left, item.box.bottom - item.box.top],
-                    "thumb_jpeg": _thumb(photo, item.box),
-                }
-                for piece_id, item in zip(piece_ids, items, strict=True)
+                _piece_json(piece_id, item, photo, item.box) for piece_id, item in zip(piece_ids, items, strict=True)
             ],
         }
     )
+
+
+class SplitRequest(BaseModel):
+    image_id: str = Field(min_length=1, max_length=64)
+    piece_id: str = Field(min_length=1, max_length=64)
+
+
+@router.post("/split")
+def split(
+    body: SplitRequest,
+    config: Annotated[Settings, Depends(deps.settings)],
+    models: Annotated[Providers, Depends(deps.providers)],
+    store: Annotated[ImageStore, Depends(deps.image_store)],
+) -> dict[str, Any]:
+    """Find design elements (logos, lettering...) inside one piece, as new choosable pieces."""
+    entry = store.get(body.image_id)
+    parent = entry.pieces.get(body.piece_id)
+    if parent is None:
+        raise ApiError(404, "piece_not_found", "That piece is no longer available. Please scan the photo again.")
+
+    whole = _to_original(entry, parent.box)
+    close_up = entry.full.crop((whole.left, whole.top, whole.right, whole.bottom))
+    model_view = close_up.copy()
+    model_view.thumbnail((config.max_image_side, config.max_image_side))  # max detail for the model
+    view_scale = close_up.width / model_view.width
+
+    elements = [
+        DetectedItem(label=e.label, box=_to_working(entry, _offset(e.box, view_scale, whole)))
+        for e in models.segmentation.detect_elements(model_view)
+    ]
+    element_ids = store.add_pieces(body.image_id, elements)
+    return ok(
+        {
+            "parent_id": body.piece_id,
+            "pieces": [
+                _piece_json(piece_id, item, entry.full, _to_original(entry, item.box))
+                for piece_id, item in zip(element_ids, elements, strict=True)
+            ],
+        }
+    )
+
+
+def _offset(box: PixelBox, scale: float, origin: PixelBox) -> PixelBox:
+    """A box from the model's view of a close-up, in full-photo pixels."""
+    return PixelBox(
+        left=origin.left + int(box.left * scale),
+        top=origin.top + int(box.top * scale),
+        right=origin.left + round(box.right * scale),
+        bottom=origin.top + round(box.bottom * scale),
+    )
+
+
+def _to_working(entry: StoredImage, box: PixelBox) -> PixelBox:
+    scale = entry.image.width / entry.full.width
+    return PixelBox(
+        left=int(box.left * scale),
+        top=int(box.top * scale),
+        right=max(int(box.left * scale) + 1, round(box.right * scale)),
+        bottom=max(int(box.top * scale) + 1, round(box.bottom * scale)),
+    )
+
+
+def _piece_json(piece_id: str, item: DetectedItem, thumb_source: Image.Image, thumb_box: PixelBox) -> dict[str, Any]:
+    b = item.box
+    return {
+        "id": piece_id,
+        "label": item.label,
+        "box": [b.left, b.top, b.right - b.left, b.bottom - b.top],
+        "thumb_jpeg": _thumb(thumb_source, thumb_box),
+    }
 
 
 def _to_original(entry: StoredImage, box: PixelBox) -> PixelBox:
