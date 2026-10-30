@@ -1,25 +1,41 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:ephemera_ai/features/archive/archive_filter_bar.dart';
+import 'package:ephemera_ai/features/archive/archive_wall.dart';
+import 'package:ephemera_ai/features/archive/scrap_detail_sheet.dart';
+import 'package:ephemera_ai/features/archive/scrap_filter.dart';
 import 'package:ephemera_ai/features/scan/scan_session_screen.dart';
-import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/features/zero_width_guard.dart';
+import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/providers.dart';
 import 'package:ephemera_ai/theme.dart';
 
-class ArchiveScreen extends ConsumerWidget {
+class ArchiveScreen extends ConsumerStatefulWidget {
   const ArchiveScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ArchiveScreen> createState() => _ArchiveScreenState();
+}
+
+class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
+  final _search = TextEditingController();
+  ScrapFilter _filter = ScrapFilter.none;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final scraps = ref.watch(scrapsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Scrap archive')),
       body: scraps.when(
         data: (items) =>
-            items.isEmpty ? const _EmptyArchive() : _ScrapGrid(scraps: items),
+            items.isEmpty ? const _EmptyArchive() : _filtered(items),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Text(
@@ -36,6 +52,53 @@ class ArchiveScreen extends ConsumerWidget {
         label: const Text('Scan'),
       ),
     );
+  }
+
+  Widget _filtered(List<Scrap> all) {
+    final tokens = context.tokens;
+    final shown = applyFilter(all, _filter);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ArchiveFilterBar(
+          filter: _filter,
+          facets: FilterFacets.of(all),
+          searchController: _search,
+          onChanged: (f) => setState(() => _filter = f),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
+          child: Row(
+            children: [
+              Text(
+                _filter.isEmpty
+                    ? '${all.length} scraps'
+                    : '${shown.length} of ${all.length} scraps',
+                style: TextStyle(color: tokens.inkSoft),
+              ),
+              const Spacer(),
+              if (!_filter.isEmpty)
+                TextButton(onPressed: _clear, child: const Text('Clear all')),
+            ],
+          ),
+        ),
+        Expanded(
+          child: shown.isEmpty
+              ? _NoMatches(onClear: _clear)
+              : ZeroWidthGuard(
+                  child: ScrapWall(
+                    scraps: shown,
+                    onTap: (s) => showScrapDetail(context, s),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  void _clear() {
+    _search.clear();
+    setState(() => _filter = ScrapFilter.none);
   }
 
   Future<void> _startScan(BuildContext context) async {
@@ -60,45 +123,48 @@ class _EmptyArchive extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    final tokens = context.tokens;
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text(
-          'Your archive is empty.\nSnap your tickets, receipts, tape and pressed flowers to begin.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Palette.inkSoft, height: 1.5),
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.local_activity_outlined, size: 56, color: tokens.accent),
+            const SizedBox(height: 12),
+            Text('Your archive is empty', style: tokens.display(22)),
+            const SizedBox(height: 8),
+            Text(
+              'Snap your tickets, receipts, tape and pressed flowers to begin.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: tokens.inkSoft, height: 1.5),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _ScrapGrid extends StatelessWidget {
-  const _ScrapGrid({required this.scraps});
+class _NoMatches extends StatelessWidget {
+  const _NoMatches({required this.onClear});
 
-  final List<Scrap> scraps;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
-    return ZeroWidthGuard(
-      child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-        ),
-        itemCount: scraps.length,
-        itemBuilder: (context, index) => DecoratedBox(
-          decoration: BoxDecoration(
-            color: Palette.paperDeep,
-            borderRadius: BorderRadius.circular(6),
+    final tokens = context.tokens;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('No scraps match', style: tokens.hand(26)),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: onClear,
+            child: const Text('Clear filters'),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Image.file(File(scraps[index].pngPath), fit: BoxFit.contain),
-          ),
-        ),
+        ],
       ),
     );
   }
