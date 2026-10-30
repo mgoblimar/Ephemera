@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:ephemera_ai/models/segmentation.dart';
 
@@ -10,6 +11,8 @@ class ScanPiece {
     required this.label,
     required this.thumbJpeg,
     this.parentId,
+    this.box,
+    this.photoSize,
   });
 
   final String id;
@@ -20,7 +23,26 @@ class ScanPiece {
   /// Set for design elements split out of a whole piece.
   final String? parentId;
 
+  /// Where the piece sits on the photo, in the detector's working pixels.
+  final Rect? box;
+
+  /// Size of the detector's working copy of the photo.
+  final Size? photoSize;
+
   bool get isElement => parentId != null;
+
+  /// [box] as fractions of the photo (0..1), for drawing over any size.
+  Rect? get area {
+    final b = box;
+    final size = photoSize;
+    if (b == null || size == null || size.isEmpty) return null;
+    return Rect.fromLTRB(
+      b.left / size.width,
+      b.top / size.height,
+      b.right / size.width,
+      b.bottom / size.height,
+    );
+  }
 
   /// Unique across a whole scan session.
   String get key => '$imageId:$id';

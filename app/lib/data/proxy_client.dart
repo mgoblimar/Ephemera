@@ -178,6 +178,11 @@ class ProxyClient {
       timeout: _slowRequestTimeout,
     );
     final imageId = data['image_id'] as String;
+    final width = data['width'] as num?;
+    final height = data['height'] as num?;
+    final photoSize = width == null || height == null
+        ? null
+        : Size(width.toDouble(), height.toDouble());
     return ScanPhoto(
       imageId: imageId,
       pieces: List.unmodifiable(
@@ -188,10 +193,21 @@ class ProxyClient {
             imageId: imageId,
             label: p['label'] as String,
             thumbJpeg: base64Decode(p['thumb_jpeg'] as String),
+            box: _pieceBox(p['box']),
+            photoSize: photoSize,
           );
         }),
       ),
     );
+  }
+
+  /// `[x, y, w, h]` in working pixels, or null when absent or malformed.
+  static Rect? _pieceBox(Object? raw) {
+    if (raw is! List || raw.length != 4 || raw.any((v) => v is! num)) {
+      return null;
+    }
+    final v = raw.cast<num>().map((n) => n.toDouble()).toList();
+    return Rect.fromLTWH(v[0], v[1], v[2], v[3]);
   }
 
   /// Find design elements (logos, lettering...) inside one whole piece.
@@ -209,6 +225,8 @@ class ProxyClient {
           label: p['label'] as String,
           thumbJpeg: base64Decode(p['thumb_jpeg'] as String),
           parentId: parent.id,
+          box: _pieceBox(p['box']),
+          photoSize: parent.photoSize,
         );
       }),
     );

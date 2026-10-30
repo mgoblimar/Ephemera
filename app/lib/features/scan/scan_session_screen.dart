@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ephemera_ai/data/proxy_client.dart';
 import 'package:ephemera_ai/features/capture/photo_source.dart';
+import 'package:ephemera_ai/features/scan/scan_motion.dart';
 import 'package:ephemera_ai/features/scan/scan_widgets.dart';
 import 'package:ephemera_ai/models/scan.dart';
 import 'package:ephemera_ai/models/segmentation.dart';
@@ -30,6 +32,9 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
   CutStyle _style = CutStyle.tight;
   CutSize _size = CutSize.m;
   bool _cutting = false;
+
+  /// Set after a successful cut: the new scraps shown before leaving.
+  ({List<Uint8List> pngs, int saved})? _reveal;
   Set<String> _splitting = const {};
   Set<String> _alreadySplit = const {};
   int _nextKey = 0;
@@ -169,7 +174,16 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
           "${result.missedCount} piece(s) couldn't be cut out. Try a clearer photo.",
         );
       }
-      Navigator.pop(context, saved);
+      if (saved == 0) {
+        Navigator.pop(context, saved);
+        return;
+      }
+      setState(
+        () => _reveal = (
+          pngs: [for (final s in result.scraps) s.scrap.png],
+          saved: saved,
+        ),
+      );
     } on ProxyException catch (e) {
       _showMessage(e.message);
     } on FileSystemException {
@@ -229,42 +243,57 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Scan session')),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            Expanded(
-              child: _photos.isEmpty
-                  ? const EmptySession()
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      children: [
-                        for (final photo in _photos)
-                          PhotoSection(
-                            photo: photo,
-                            chosen: _chosen,
-                            onToggle: _toggle,
-                            onChooseAll: (all) => _chooseAll(photo, all),
-                            onRetry: () => _retry(photo),
-                            onRemove: () => _remove(photo),
-                            splitting: _splitting,
-                            alreadySplit: _alreadySplit,
-                            onSplit: (piece) => _split(photo, piece),
-                          ),
-                      ],
-                    ),
-            ),
-            CutBar(
-              chosenCount: _chosenPieces.length,
-              style: _style,
-              size: _size,
-              cutting: _cutting,
-              onStyle: (s) => setState(() => _style = s),
-              onSize: (s) => setState(() => _size = s),
-              onAddPhoto: _cutting ? null : _addPhoto,
-              onCut: _cutAndSave,
-            ),
+            _session(),
+            if (_reveal case final reveal?)
+              Positioned.fill(
+                child: CutReveal(
+                  pngs: reveal.pngs,
+                  onDone: () => Navigator.pop(context, reveal.saved),
+                ),
+              ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _session() {
+    return Column(
+      children: [
+        Expanded(
+          child: _photos.isEmpty
+              ? const EmptySession()
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  children: [
+                    for (final photo in _photos)
+                      PhotoSection(
+                        photo: photo,
+                        chosen: _chosen,
+                        onToggle: _toggle,
+                        onChooseAll: (all) => _chooseAll(photo, all),
+                        onRetry: () => _retry(photo),
+                        onRemove: () => _remove(photo),
+                        splitting: _splitting,
+                        alreadySplit: _alreadySplit,
+                        onSplit: (piece) => _split(photo, piece),
+                      ),
+                  ],
+                ),
+        ),
+        CutBar(
+          chosenCount: _chosenPieces.length,
+          style: _style,
+          size: _size,
+          cutting: _cutting,
+          onStyle: (s) => setState(() => _style = s),
+          onSize: (s) => setState(() => _size = s),
+          onAddPhoto: _cutting ? null : _addPhoto,
+          onCut: _cutAndSave,
+        ),
+      ],
     );
   }
 }

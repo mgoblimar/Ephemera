@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:ephemera_ai/features/editor/handwriting.dart';
 import 'package:ephemera_ai/data/enrichment_service.dart';
 import 'package:ephemera_ai/data/proxy_client.dart';
 import 'package:ephemera_ai/data/scrap_repository.dart';
@@ -87,6 +88,8 @@ Future<List<Scrap>> _cutAndWait(
 
 void main() {
   late Directory root;
+
+  setUpAll(() => useGoogleFonts = false);
 
   setUp(() async => root = await Directory.systemTemp.createTemp('scan_test'));
   tearDown(() async => root.delete(recursive: true));
@@ -176,6 +179,53 @@ void main() {
     final parentIds = elements.map((s) => s.parentScrapId).toSet();
     expect(parentIds, hasLength(1));
     expect(saved.map((s) => s.id), contains(parentIds.single));
+  });
+
+  testWidgets('looking closer shows split elements and can drop one', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app(_proxy([]), FileScrapRepository(root)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Split').first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Look closer').first);
+    await tester.pumpAndSettle();
+    expect(find.text('2 elements split out'), findsOneWidget);
+
+    final sheet = find.byType(DraggableScrollableSheet);
+    final logo = find.descendant(of: sheet, matching: find.text('logo'));
+    await tester.dragUntilVisible(logo, sheet, const Offset(0, -150));
+    await tester.tap(logo);
+    await tester.pumpAndSettle();
+
+    Navigator.of(tester.element(find.text('Split elements'))).pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Cut & save 3'), findsOneWidget);
+  });
+
+  testWidgets('a finished cut shows the new scraps before leaving', (
+    tester,
+  ) async {
+    final repository = FileScrapRepository(root);
+    await tester.pumpWidget(_app(_proxy([]), repository));
+    await tester.pumpAndSettle();
+
+    await _cutAndWait(tester, 'Cut & save 2', repository, 2);
+    for (
+      var i = 0;
+      i < 20 && find.text('Cut out 2 scraps!').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+
+    expect(find.text('Cut out 2 scraps!'), findsOneWidget);
+    expect(find.text('Saved to your archive'), findsOneWidget);
+    await tester.pumpAndSettle(); // let the reveal animation finish
   });
 
   testWidgets('a failed scan shows the error with retry', (tester) async {

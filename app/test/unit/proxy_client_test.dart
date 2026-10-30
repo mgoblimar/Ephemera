@@ -33,6 +33,20 @@ void main() {
       expect(result.photoJpeg, base64Decode(tinyPngBase64));
     });
 
+    test('scan pieces know where they sit on the photo', () async {
+      final client = ProxyClient(
+        baseUrl: 'http://proxy',
+        httpClient: fakeProxy((_) => okEnvelope(scanDetectData('img1'))),
+      );
+
+      final photo = await client.scanDetect(Uint8List.fromList([1, 2, 3]));
+
+      final piece = photo.pieces.first;
+      expect(piece.box, const Rect.fromLTWH(10, 10, 50, 50));
+      expect(piece.area!.left, closeTo(10 / 400, 1e-9));
+      expect(piece.area!.bottom, closeTo(60 / 300, 1e-9));
+    });
+
     test('cutout sends style and size and parses scraps', () async {
       final log = <http.Request>[];
       final client = ProxyClient(

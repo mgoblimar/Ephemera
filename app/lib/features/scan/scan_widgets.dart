@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:ephemera_ai/config.dart';
 import 'package:ephemera_ai/features/capture/cut_style_picker.dart';
+import 'package:ephemera_ai/features/empty_state.dart';
+import 'package:ephemera_ai/features/scan/piece_preview_sheet.dart';
+import 'package:ephemera_ai/features/scan/scan_motion.dart';
 import 'package:ephemera_ai/models/scan.dart';
 import 'package:ephemera_ai/models/segmentation.dart';
 import 'package:ephemera_ai/theme.dart';
-import 'package:ephemera_ai/features/empty_state.dart';
 
 const _thumbSize = 96.0;
 
@@ -23,6 +25,9 @@ class EmptySession extends StatelessWidget {
 }
 
 /// One scanned photo: a header and a tile per detected piece.
+const _loadingPhotoHeight = 160.0;
+const _ghostTiles = 2;
+
 class PhotoSection extends StatelessWidget {
   const PhotoSection({
     super.key,
@@ -88,26 +93,57 @@ class PhotoSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
+          if (photo.isLoading)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Shimmer(
+                child: Image.memory(
+                  photo.bytes,
+                  height: _loadingPhotoHeight,
+                  fit: BoxFit.cover,
+                  cacheHeight: (_loadingPhotoHeight * 2).round(),
+                ),
+              ),
+            ),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final piece in pieces)
-                PieceTile(
-                  piece: piece,
-                  chosen: chosen.contains(piece.key),
-                  onTap: () => onToggle(piece),
-                  splitting: splitting.contains(piece.key),
-                  onSplit: piece.isElement || alreadySplit.contains(piece.key)
-                      ? null
-                      : () => onSplit(piece),
+              for (final (i, piece) in pieces.indexed) ...[
+                PopIn(
+                  key: ValueKey(piece.key),
+                  index: i,
+                  child: PieceTile(
+                    piece: piece,
+                    chosen: chosen.contains(piece.key),
+                    onTap: () => onToggle(piece),
+                    onPreview: () => showPiecePreview(
+                      context,
+                      photo: photo,
+                      piece: piece,
+                      chosen: chosen,
+                      onToggle: onToggle,
+                      onSplit: _splitAction(piece),
+                    ),
+                    splitting: splitting.contains(piece.key),
+                    onSplit: _splitAction(piece),
+                  ),
                 ),
+                // Placeholders where the split elements will land.
+                if (splitting.contains(piece.key))
+                  for (var g = 0; g < _ghostTiles; g++) const _GhostTile(),
+              ],
             ],
           ),
         ],
       ),
     );
   }
+
+  VoidCallback? _splitAction(ScanPiece piece) =>
+      piece.isElement || alreadySplit.contains(piece.key)
+      ? null
+      : () => onSplit(piece);
 
   Widget _status(int count) {
     if (photo.isLoading) {
@@ -150,6 +186,7 @@ class PieceTile extends StatelessWidget {
     required this.piece,
     required this.chosen,
     required this.onTap,
+    this.onPreview,
     this.splitting = false,
     this.onSplit,
   });
@@ -157,6 +194,9 @@ class PieceTile extends StatelessWidget {
   final ScanPiece piece;
   final bool chosen;
   final VoidCallback onTap;
+
+  /// Opens the closer look (magnifier, or long-press on the tile).
+  final VoidCallback? onPreview;
   final bool splitting;
 
   /// Null hides the Split action (elements, or pieces already split).
@@ -181,6 +221,7 @@ class PieceTile extends StatelessWidget {
             button: true,
             child: GestureDetector(
               onTap: onTap,
+              onLongPress: onPreview,
               behavior: HitTestBehavior.opaque,
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 150),
@@ -203,10 +244,10 @@ class PieceTile extends StatelessWidget {
           ),
           if (splitting)
             const Padding(
-              padding: EdgeInsets.only(bottom: 6),
-              child: SizedBox.square(
-                dimension: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
+              padding: EdgeInsets.only(bottom: 4),
+              child: Text(
+                'Splitting…',
+                style: TextStyle(fontSize: 12, color: Palette.inkSoft),
               ),
             )
           else if (onSplit != null)
@@ -233,17 +274,32 @@ class PieceTile extends StatelessWidget {
   }
 
   Widget _thumbWithCheck() {
+    final thumb = ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+      child: Image.memory(
+        piece.thumbJpeg,
+        width: _thumbSize,
+        height: _thumbSize - 20,
+        fit: BoxFit.cover,
+      ),
+    );
     return Stack(
       children: [
-        ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-          child: Image.memory(
-            piece.thumbJpeg,
-            width: _thumbSize,
-            height: _thumbSize - 20,
-            fit: BoxFit.cover,
+        if (splitting) Shimmer(child: thumb) else thumb,
+        if (onPreview != null)
+          Positioned(
+            top: 0,
+            left: 0,
+            child: IconButton(
+              tooltip: 'Look closer',
+              onPressed: onPreview,
+              visualDensity: VisualDensity.compact,
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.black.withValues(alpha: 0.35),
+              ),
+              icon: const Icon(Icons.zoom_in, size: 18, color: Colors.white),
+            ),
           ),
-        ),
         Positioned(
           top: 4,
           right: 4,
@@ -254,6 +310,25 @@ class PieceTile extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A shimmering empty tile, standing in for a split element still being found.
+class _GhostTile extends StatelessWidget {
+  const _GhostTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Container(
+        width: _thumbSize,
+        height: _thumbSize + 18,
+        decoration: BoxDecoration(
+          color: Palette.paperDeep,
+          borderRadius: BorderRadius.circular(6),
+        ),
+      ),
     );
   }
 }
