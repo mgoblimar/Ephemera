@@ -9,7 +9,7 @@ from typing import Literal
 
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
-from scipy.ndimage import binary_fill_holes
+from scipy.ndimage import binary_fill_holes, label
 
 from app.envelope import ApiError
 
@@ -26,6 +26,8 @@ CROP_PADDING = 2
 # to about this level at distance r, so thresholding here dilates by ~r pixels.
 DILATE_THRESHOLD = 0.023
 STICKER_WHITE = 255
+# Mask parts smaller than this fraction of the largest part are treated as stray specks.
+ISLAND_KEEP_FRACTION = 0.15
 
 
 def load_upload(data: bytes, max_bytes: int, max_side: int, keep_alpha: bool = False) -> Image.Image:
@@ -88,6 +90,20 @@ def feather(alpha: np.ndarray, radius: float = FEATHER_RADIUS) -> np.ndarray:
     return np.asarray(image.filter(ImageFilter.GaussianBlur(radius)), dtype=np.float32) / 255
 
 
+def drop_islands(alpha: np.ndarray, keep_fraction: float = ISLAND_KEEP_FRACTION) -> np.ndarray:
+    """Remove small disconnected blobs (stray bits of neighbouring print) from a mask.
+
+    Keeps every connected part at least `keep_fraction` of the largest part's size,
+    so a cut-out word with separate letters survives but specks don't.
+    """
+    labels, count = label(alpha > MASK_THRESHOLD)
+    if count <= 1:
+        return alpha
+    sizes = np.bincount(labels.ravel())[1:]
+    keep = np.flatnonzero(sizes >= sizes.max() * keep_fraction) + 1
+    return np.where(np.isin(labels, keep), alpha, 0.0).astype(np.float32)
+
+
 def fill_holes(alpha: np.ndarray) -> np.ndarray:
     """Fill enclosed gaps (e.g. glare the model left out) - real scraps rarely have holes."""
     filled = binary_fill_holes(alpha > MASK_THRESHOLD)
@@ -144,7 +160,7 @@ def apply_cut_style(
     """
     rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
     border = border_px(size, image.size) if border is None else border
-    alpha = fill_holes(alpha)
+    alpha = fill_holes(drop_islands(alpha))
 
     if style == "tight":
         out_rgb, out_alpha = rgb, feather(alpha)

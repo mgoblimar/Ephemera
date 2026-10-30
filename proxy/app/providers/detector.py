@@ -8,11 +8,11 @@ import json
 import logging
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
 
 from PIL import Image
 
-from app.providers.sam import MAX_OBJECTS_PER_REQUEST, PixelBox
+from app.providers.base import DetectedItem, PixelBox
+from app.providers.sam import MAX_OBJECTS_PER_REQUEST
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +48,20 @@ For each piece give:
 List at most {MAX_OBJECTS_PER_REQUEST} pieces, largest first.
 Reply with only: {{"items": [{{"label": "...", "box": [x1, y1, x2, y2]}}]}}"""
 
-
-@dataclass(frozen=True)
-class DetectedItem:
-    label: str
-    box: PixelBox
+# Splitting one scrap into the printed design elements a journaler would cut out on their own.
+ELEMENT_TYPES = ("logo", "lettering", "illustration", "badge", "character", "pattern", "photo", "other")
+ELEMENT_PROMPT = f"""This is a close-up of one junk-journal scrap (a wrapper, ticket, box, bag, label, etc.).
+List the printed design elements on it that a journaler could cut out and use on their own as a
+sticker: logos, words or lettering, illustrations, badges or labels, characters, decorative motifs.
+- Each element is one visually self-contained shape; keep a logo with its own outline/frame.
+- Skip plain background, fine print, barcodes, nutrition facts and anything covering most of the scrap.
+For each element give:
+- "label": one of {", ".join(ELEMENT_TYPES)}
+- "box": [x1, y1, x2, y2], the tight bounding box on a 0-{COORDINATE_SCALE} grid where (0,0) is the
+  top-left of this image and ({COORDINATE_SCALE},{COORDINATE_SCALE}) the bottom-right.
+List at most 8 elements, most eye-catching first.
+Reply with only: {{"items": [{{"label": "...", "box": [x1, y1, x2, y2]}}]}}"""
+MAX_ELEMENTS = 8
 
 
 class SparkItemDetector:
@@ -63,15 +72,22 @@ class SparkItemDetector:
         reply = self._transport(SYSTEM_PROMPT, USER_PROMPT, image)
         return parse_detections(reply, image.size)
 
+    def detect_elements(self, scrap: Image.Image) -> list[DetectedItem]:
+        """Design elements inside one scrap's crop; boxes are in the crop's pixels."""
+        reply = self._transport(SYSTEM_PROMPT, ELEMENT_PROMPT, scrap)
+        return parse_detections(reply, scrap.size, allowed=ELEMENT_TYPES)[:MAX_ELEMENTS]
 
-def parse_detections(reply: str, size: tuple[int, int]) -> list[DetectedItem]:
+
+def parse_detections(
+    reply: str, size: tuple[int, int], allowed: tuple[str, ...] = SCRAP_TYPES
+) -> list[DetectedItem]:
     """Parse the model's JSON, scale boxes to pixels and drop anything malformed."""
     payload = _extract_json(reply)
     if payload is None:
         logger.warning("Detector reply was not JSON: %.200s", reply)
         return []
     raw_items = payload.get("items", []) if isinstance(payload, dict) else []
-    items = [item for raw in raw_items if (item := _to_item(raw, size)) is not None]
+    items = [item for raw in raw_items if (item := _to_item(raw, size, allowed)) is not None]
     return items[:MAX_OBJECTS_PER_REQUEST]
 
 
@@ -88,7 +104,7 @@ def _extract_json(reply: str) -> object | None:
         return None
 
 
-def _to_item(raw: object, size: tuple[int, int]) -> DetectedItem | None:
+def _to_item(raw: object, size: tuple[int, int], allowed: tuple[str, ...]) -> DetectedItem | None:
     if not isinstance(raw, dict):
         return None
     box = raw.get("box")
@@ -102,6 +118,6 @@ def _to_item(raw: object, size: tuple[int, int]) -> DetectedItem | None:
         return None
     label = raw.get("label")
     return DetectedItem(
-        label=label if label in SCRAP_TYPES else "other",
+        label=label if label in allowed else "other",
         box=PixelBox(left=left, top=top, right=right, bottom=bottom),
     )

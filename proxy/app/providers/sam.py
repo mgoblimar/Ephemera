@@ -6,9 +6,10 @@ raster, scale it up to the box and paste it into a full-size alpha mask.
 """
 
 import logging
+import math
 import re
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 from meta_sam_parser import (
@@ -28,7 +29,7 @@ from meta_sam_parser import (
 from meta_sam_parser._mask_codec import _decode_raster
 from PIL import Image
 
-from app.providers.base import Mask, PointPrompt
+from app.providers.base import Mask, PixelBox, PointPrompt
 
 logger = logging.getLogger(__name__)
 
@@ -43,13 +44,6 @@ SamTransport = Callable[[str, Image.Image], str]
 MAX_OBJECTS_PER_REQUEST = 16  # documented SAM limit for box/point prompts
 DEFAULT_SCORE = 1.0  # used when the response carries no confidence
 
-
-@dataclass(frozen=True)
-class PixelBox:
-    left: int
-    top: int
-    right: int  # exclusive
-    bottom: int  # exclusive
 
 
 class SamClient:
@@ -90,6 +84,7 @@ class _RawMask:
     bounds: PixelBox
     mask: SegmentationMask
     confidence: float | None
+    source_size: tuple[int, int] | None = None  # (w, h) SAM says its coordinates refer to
 
 
 def parse_sam_output(output_text: str, size: tuple[int, int]) -> dict[str, Mask]:
@@ -98,7 +93,7 @@ def parse_sam_output(output_text: str, size: tuple[int, int]) -> dict[str, Mask]
     if not records and "<|mask" in output_text:
         records = _library_records(output_text)  # unexpected format: let Meta's parser handle it
     masks: dict[str, Mask] = {}
-    for record in records:
+    for record in (_rescale(r, size) for r in records):
         raster = _decode_once(record.mask)
         if raster is None:
             logger.warning("Skipping undecodable SAM mask for object %s", record.object_id)
@@ -135,9 +130,30 @@ def _fast_records(output_text: str) -> list[_RawMask]:
                     height=int(data.group(1)),
                 ),
                 confidence=_confidence(mask.get("c") or box.get("c")),
+                source_size=_int_pair(box.get("w"), box.get("h")),
             )
         )
     return records
+
+
+def _int_pair(a: str | None, b: str | None) -> tuple[int, int] | None:
+    try:
+        return (int(a), int(b)) if a and b else None
+    except ValueError:
+        return None
+
+
+def _rescale(record: _RawMask, size: tuple[int, int]) -> _RawMask:
+    """SAM may work on a downscaled copy of large images; map its coordinates back to ours."""
+    if record.source_size is None or record.source_size == size:
+        return record
+    logger.warning("SAM coordinates are for %s, our image is %s; rescaling", record.source_size, size)
+    sx, sy = size[0] / record.source_size[0], size[1] / record.source_size[1]
+    b = record.bounds
+    scaled = PixelBox(
+        left=int(b.left * sx), top=int(b.top * sy), right=math.ceil(b.right * sx), bottom=math.ceil(b.bottom * sy)
+    )
+    return replace(record, bounds=scaled, source_size=size)
 
 
 def _library_records(output_text: str) -> list[_RawMask]:

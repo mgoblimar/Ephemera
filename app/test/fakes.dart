@@ -31,6 +31,38 @@ Map<String, dynamic> segmentAutoData({int masks = 3}) => {
   ],
 };
 
+Map<String, dynamic> scanDetectData(String imageId, {int pieces = 2}) => {
+  'image_id': imageId,
+  'width': 400,
+  'height': 300,
+  'pieces': [
+    for (var i = 0; i < pieces; i++)
+      {
+        'id': 'p$i',
+        'label': i.isEven ? 'sticker' : 'ticket',
+        'box': [10, 10, 50, 50],
+        'thumb_jpeg': tinyPngBase64,
+      },
+  ],
+};
+
+Map<String, dynamic> scanCutData(List<Map<String, dynamic>> refs) => {
+  'scraps': [
+    for (final r in refs)
+      {
+        'image_id': r['image_id'],
+        'piece_id': r['piece_id'],
+        'label': 'sticker',
+        'png_base64': tinyPngBase64,
+        'width': 1,
+        'height': 1,
+        'palette': ['#FFFFFF'],
+      },
+  ],
+  'missed': <dynamic>[],
+  'sam_requests': 1,
+};
+
 /// A fake proxy: [handler] returns the envelope for each request, which is
 /// optionally recorded in [log]. Error envelopes get HTTP 404.
 MockClient fakeProxy(

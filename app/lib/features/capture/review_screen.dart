@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ephemera_ai/data/proxy_client.dart';
+import 'package:ephemera_ai/features/capture/cut_style_picker.dart';
 import 'package:ephemera_ai/features/capture/photo_with_masks.dart';
 import 'package:ephemera_ai/models/segmentation.dart';
 import 'package:ephemera_ai/providers.dart';
@@ -173,7 +174,7 @@ class _CaptureReviewScreenState extends ConsumerState<CaptureReviewScreen> {
           ),
           const SizedBox(height: 8),
           _MaskChips(masks: result.masks, kept: _kept, onToggle: _toggle),
-          _CutStylePicker(
+          CutStylePicker(
             style: _style,
             size: _size,
             onStyle: (s) => setState(() => _style = s),
@@ -226,57 +227,6 @@ class _MaskChips extends StatelessWidget {
             onSelected: (_) => onToggle(mask.id),
           ),
       ],
-    );
-  }
-}
-
-class _CutStylePicker extends StatelessWidget {
-  const _CutStylePicker({
-    required this.style,
-    required this.size,
-    required this.onStyle,
-    required this.onSize,
-  });
-
-  final CutStyle style;
-  final CutSize size;
-  final ValueChanged<CutStyle> onStyle;
-  final ValueChanged<CutSize> onSize;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: SegmentedButton<CutStyle>(
-              segments: const [
-                ButtonSegment(value: CutStyle.tight, label: Text('Tight')),
-                ButtonSegment(value: CutStyle.sticker, label: Text('Sticker')),
-                ButtonSegment(value: CutStyle.margin, label: Text('Margin')),
-              ],
-              selected: {style},
-              showSelectedIcon: false,
-              onSelectionChanged: (s) => onStyle(s.first),
-            ),
-          ),
-          const SizedBox(width: 8),
-          SegmentedButton<CutSize>(
-            segments: const [
-              ButtonSegment(value: CutSize.s, label: Text('S')),
-              ButtonSegment(value: CutSize.m, label: Text('M')),
-              ButtonSegment(value: CutSize.l, label: Text('L')),
-            ],
-            selected: {size},
-            showSelectedIcon: false,
-            // Border size only matters for sticker and margin cuts.
-            onSelectionChanged: style == CutStyle.tight
-                ? null
-                : (s) => onSize(s.first),
-          ),
-        ],
-      ),
     );
   }
 }

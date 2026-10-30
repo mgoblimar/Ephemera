@@ -11,7 +11,7 @@ from openai import OpenAI
 from PIL import Image
 
 from app.config import Settings
-from app.providers.base import Mask, PointPrompt
+from app.providers.base import DetectedItem, Mask, PixelBox, PointPrompt
 from app.providers.detector import SparkItemDetector, VisionTransport
 from app.providers.meta_client import call_model, image_data_url, log_usage
 from app.providers.sam import SamClient, SamTransport, mask_iou
@@ -51,6 +51,14 @@ class RealSegmentationProvider:
             # An all-zero mask makes the route answer "Nothing found at that spot".
             return Mask(alpha=_empty(image), score=0.0)
         return mask
+
+    def detect_items(self, image: Image.Image) -> list[DetectedItem]:
+        items = self._detector.detect(image)
+        logger.info("Detector found %d items: %s", len(items), [i.label for i in items])
+        return items
+
+    def segment_boxes(self, image: Image.Image, boxes: Sequence[PixelBox]) -> list[Mask | None]:
+        return self._sam.segment_boxes(image, boxes)
 
     def _detected_masks(self, image: Image.Image) -> list[Mask]:
         items = self._detector.detect(image)

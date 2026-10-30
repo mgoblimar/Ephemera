@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 10 * 1024 * 1024
     max_image_side: int = 1536  # what the models see
     max_original_side: int = 3072  # what scraps are cut from
-    image_ttl_seconds: int = 900
+    image_ttl_seconds: int = 1800  # a scan session can take a while
     rate_limit_per_minute: int = 60
 
     def validate_for_startup(self) -> None:

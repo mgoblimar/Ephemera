@@ -6,7 +6,7 @@ from collections.abc import Sequence
 import numpy as np
 from PIL import Image
 
-from app.providers.base import Enrichment, Mask, PointPrompt
+from app.providers.base import DetectedItem, Enrichment, Mask, PixelBox, PointPrompt
 
 # (center x, center y, radius x, radius y) as fractions of the photo size.
 MOCK_AUTO_ELLIPSES = (
@@ -14,6 +14,7 @@ MOCK_AUTO_ELLIPSES = (
     (0.72, 0.34, 0.15, 0.17),
     (0.50, 0.72, 0.22, 0.12),
 )
+MOCK_LABELS = ("ticket", "wrapper", "sticker")
 MOCK_POINT_RADIUS_FRACTION = 0.12
 SOFT_EDGE_PX = 3.0
 
@@ -32,6 +33,34 @@ class MockSegmentationProvider:
         return [
             Mask(alpha=ellipse_mask(width, height, cx * width, cy * height, rx * width, ry * height), score=0.9)
             for cx, cy, rx, ry in MOCK_AUTO_ELLIPSES
+        ]
+
+    def detect_items(self, image: Image.Image) -> list[DetectedItem]:
+        width, height = image.size
+        return [
+            DetectedItem(
+                label=label,
+                box=PixelBox(
+                    left=round((cx - rx) * width),
+                    top=round((cy - ry) * height),
+                    right=round((cx + rx) * width),
+                    bottom=round((cy + ry) * height),
+                ),
+            )
+            for (cx, cy, rx, ry), label in zip(MOCK_AUTO_ELLIPSES, MOCK_LABELS, strict=True)
+        ]
+
+    def segment_boxes(self, image: Image.Image, boxes: Sequence[PixelBox]) -> list[Mask | None]:
+        """An ellipse inscribed in each box."""
+        width, height = image.size
+        return [
+            Mask(
+                alpha=ellipse_mask(
+                    width, height, (b.left + b.right) / 2, (b.top + b.bottom) / 2, (b.right - b.left) / 2, (b.bottom - b.top) / 2
+                ),
+                score=0.9,
+            )
+            for b in boxes
         ]
 
     def point_mask(self, image: Image.Image, points: Sequence[PointPrompt]) -> Mask:

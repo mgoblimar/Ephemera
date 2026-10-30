@@ -11,3 +11,9 @@ const proxyUrl = String.fromEnvironment(
 /// so it matches the proxy's max_original_side.
 const maxCaptureSide = 3072.0;
 const captureJpegQuality = 90;
+
+/// SAM cuts up to this many pieces per billed request (the proxy batches them).
+const piecesPerSamRequest = 16;
+
+/// Shown to the user before cutting; SAM 3.1 is $0.0025 per request at ₱64/USD.
+const samRequestCostPesos = 0.16;

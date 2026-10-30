@@ -4,9 +4,13 @@ import 'dart:ui';
 
 import 'package:http/http.dart' as http;
 
+import 'package:ephemera_ai/models/scan.dart';
 import 'package:ephemera_ai/models/segmentation.dart';
 
 const _requestTimeout = Duration(seconds: 30);
+
+/// Detection and batched cutting upload/download full-size images.
+const _slowRequestTimeout = Duration(seconds: 90);
 
 /// Error from the proxy, carrying its envelope code and a user-facing message.
 class ProxyException implements Exception {
@@ -90,28 +94,98 @@ class ProxyClient {
     );
   }
 
+  /// Detect pieces in a photo without cutting them (cheap: no SAM call).
+  Future<ScanPhoto> scanDetect(
+    Uint8List photo, {
+    String filename = 'photo.jpg',
+  }) async {
+    final request = http.MultipartRequest('POST', _uri('/scan/detect'))
+      ..files.add(
+        http.MultipartFile.fromBytes('image', photo, filename: filename),
+      );
+    final data = await _send(
+      () async => http.Response.fromStream(await _http.send(request)),
+      timeout: _slowRequestTimeout,
+    );
+    final imageId = data['image_id'] as String;
+    return ScanPhoto(
+      imageId: imageId,
+      pieces: List.unmodifiable(
+        (data['pieces'] as List<dynamic>).map((raw) {
+          final p = raw as Map<String, dynamic>;
+          return ScanPiece(
+            id: p['id'] as String,
+            imageId: imageId,
+            label: p['label'] as String,
+            thumbJpeg: base64Decode(p['thumb_jpeg'] as String),
+          );
+        }),
+      ),
+    );
+  }
+
+  /// Cut the chosen pieces; the proxy packs up to 16 per SAM request.
+  Future<ScanCutResult> scanCut({
+    required List<ScanPiece> pieces,
+    required CutStyle style,
+    required CutSize size,
+  }) async {
+    final data = await _postJson('/scan/cut', {
+      'pieces': [
+        for (final p in pieces) {'image_id': p.imageId, 'piece_id': p.id},
+      ],
+      'cut_style': style.name,
+      'cut_size': size.name,
+    }, timeout: _slowRequestTimeout);
+    return ScanCutResult(
+      scraps: List.unmodifiable(
+        (data['scraps'] as List<dynamic>).map((raw) {
+          final s = raw as Map<String, dynamic>;
+          return (
+            imageId: s['image_id'] as String,
+            scrap: CutoutScrap(
+              maskId: s['piece_id'] as String,
+              png: base64Decode(s['png_base64'] as String),
+              width: s['width'] as int,
+              height: s['height'] as int,
+              palette: List.unmodifiable(
+                (s['palette'] as List<dynamic>).cast<String>(),
+              ),
+              label: s['label'] as String?,
+            ),
+          );
+        }),
+      ),
+      missedCount: (data['missed'] as List<dynamic>).length,
+      samRequests: data['sam_requests'] as int,
+    );
+  }
+
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
 
   Future<Map<String, dynamic>> _postJson(
     String path,
-    Map<String, dynamic> body,
-  ) {
+    Map<String, dynamic> body, {
+    Duration timeout = _requestTimeout,
+  }) {
     return _send(
       () => _http.post(
         _uri(path),
         headers: const {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       ),
+      timeout: timeout,
     );
   }
 
   /// Sends a request and unwraps the {ok, data, error} envelope.
   Future<Map<String, dynamic>> _send(
-    Future<http.Response> Function() request,
-  ) async {
+    Future<http.Response> Function() request, {
+    Duration timeout = _requestTimeout,
+  }) async {
     final http.Response response;
     try {
-      response = await request().timeout(_requestTimeout);
+      response = await request().timeout(timeout);
     } on Exception {
       throw const ProxyException(
         'network_error',

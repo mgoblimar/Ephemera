@@ -17,6 +17,20 @@ class PointPrompt:
 
 
 @dataclass(frozen=True)
+class PixelBox:
+    left: int
+    top: int
+    right: int  # exclusive
+    bottom: int  # exclusive
+
+
+@dataclass(frozen=True)
+class DetectedItem:
+    label: str
+    box: PixelBox
+
+
+@dataclass(frozen=True)
 class Mask:
     alpha: np.ndarray  # (height, width) float32 in [0, 1]
     score: float
@@ -39,6 +53,14 @@ class SegmentationProvider(Protocol):
     def auto_masks(self, image: Image.Image) -> list[Mask]: ...
 
     def point_mask(self, image: Image.Image, points: Sequence[PointPrompt]) -> Mask: ...
+
+    def detect_items(self, image: Image.Image) -> list[DetectedItem]:
+        """Find pieces without cutting them (cheap: no SAM call)."""
+        ...
+
+    def segment_boxes(self, image: Image.Image, boxes: Sequence[PixelBox]) -> list[Mask | None]:
+        """Cut up to 16 boxes in one SAM request."""
+        ...
 
 
 class VisionLLMProvider(Protocol):

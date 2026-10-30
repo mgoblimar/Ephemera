@@ -2,7 +2,7 @@ import numpy as np
 from PIL import Image
 
 from app.image_store import ImageStore
-from app.imaging import apply_cut_style, cut_from_original, dominant_palette, fill_holes, mask_bbox
+from app.imaging import apply_cut_style, cut_from_original, dominant_palette, drop_islands, fill_holes, mask_bbox
 from app.providers.mock import ellipse_mask
 
 PHOTO = Image.new("RGB", (300, 200), (40, 90, 160))
@@ -59,6 +59,18 @@ def test_fill_holes_closes_gaps_inside_a_mask() -> None:
 
     assert filled[100, 150] == 1.0
     assert filled[0, 0] == 0.0  # outside stays outside
+
+
+def test_drop_islands_removes_specks_but_keeps_big_parts() -> None:
+    alpha = np.zeros((100, 200), dtype=np.float32)
+    alpha[20:80, 10:60] = 1.0  # main shape
+    alpha[20:70, 80:120] = 1.0  # second letter, similar size: kept
+    alpha[5:8, 180:184] = 1.0  # stray speck: dropped
+
+    cleaned = drop_islands(alpha)
+
+    assert cleaned[50, 30] == 1.0 and cleaned[40, 100] == 1.0
+    assert cleaned[6, 182] == 0.0
 
 
 def test_sticker_cut_has_no_white_blob_where_the_mask_had_a_hole() -> None:
