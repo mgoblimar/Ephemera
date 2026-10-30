@@ -65,8 +65,13 @@ sticker: logos, words or lettering, illustrations, badges or labels, characters,
 - Each element is one self-contained printed shape with a clear edge against what surrounds it;
   keep a logo with its own outline/frame.
 - Include the main illustration or product picture when it stands out clearly from its background.
+- An illustration or photo counts only if it is a complete, recognisable thing on its own (a
+  character, a cookie, a cup, a flower): never a fragment of the background art.
 - Skip plain background, fine print, paragraphs of small text, barcodes and nutrition facts,
-  see-through windows or holes, tiny marks, and pictures that blend into busy surroundings.
+  printed dates, batch codes and weights, see-through windows or holes, tiny marks, and pictures
+  that blend into busy surroundings.
+- Skip splashes, swooshes, drips, ribbons and other background shapes, and anything cut off by
+  the edge of the scrap or partly covered by another element.
 For each element give:
 - "label": one of {labels}
 - "box": [x1, y1, x2, y2] in pixels, where (0,0) is the top-left of this image and ({width},{height})
