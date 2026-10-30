@@ -10,6 +10,7 @@ from PIL import Image
 
 if TYPE_CHECKING:
     from app.agent.archive_search import ScrapSummary
+    from app.agent.layout import LayoutScrap, PageLayout
     from app.agent.planner import BlendPlan
 
 
@@ -75,6 +76,14 @@ class AgentPlanner(Protocol):
     """Theme Blend agent (Muse Wonder): theme + archive summaries -> Blend Plan."""
 
     def plan(self, theme: str, pinned_ids: Sequence[str], archive: Sequence["ScrapSummary"]) -> "BlendPlan": ...
+
+
+class PageDesigner(Protocol):
+    """Theme Blend build step: arranges an approved plan's scraps on a page."""
+
+    def layout(
+        self, title: str, layout_intent: str, paper: str, scraps: Sequence["LayoutScrap"], captions: Sequence[str]
+    ) -> "PageLayout": ...
 
 
 class VisionLLMProvider(Protocol):

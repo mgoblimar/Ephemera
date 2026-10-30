@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 
 from app.config import Settings
+from app.agent.layout import LayoutDesigner, MockLayoutDesigner
 from app.agent.planner import BlendPlanner
-from app.agent.transport import MockPlanner, agent_transport
-from app.providers.base import AgentPlanner, SegmentationProvider, VisionLLMProvider
+from app.agent.transport import MockPlanner, agent_transport, layout_transport
+from app.providers.base import AgentPlanner, PageDesigner, SegmentationProvider, VisionLLMProvider
 from app.providers.detector import SparkItemDetector
 from app.providers.enricher import SparkEnricher
 from app.providers.meta_client import build_client
@@ -17,13 +18,17 @@ class Providers:
     segmentation: SegmentationProvider
     vision: VisionLLMProvider
     agent: AgentPlanner
+    designer: PageDesigner
     mode: str
 
 
 def build_providers(settings: Settings) -> Providers:
     if not settings.use_real_providers:
         return Providers(
-            segmentation=MockSegmentationProvider(), vision=MockVisionLLMProvider(), agent=MockPlanner(), mode="mock"
+            segmentation=MockSegmentationProvider(), vision=MockVisionLLMProvider(),
+            agent=MockPlanner(),
+            designer=MockLayoutDesigner(),
+            mode="mock",
         )
 
     client = build_client(settings)
@@ -34,4 +39,5 @@ def build_providers(settings: Settings) -> Providers:
     )
     vision = SparkEnricher(vision_transport(client, settings, what="Enrichment"))
     agent = BlendPlanner(agent_transport(client, settings))
-    return Providers(segmentation=segmentation, vision=vision, agent=agent, mode="real")
+    designer = LayoutDesigner(layout_transport(client, settings))
+    return Providers(segmentation=segmentation, vision=vision, agent=agent, designer=designer, mode="real")

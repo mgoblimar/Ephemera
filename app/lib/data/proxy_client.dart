@@ -128,6 +128,30 @@ class ProxyClient {
     return BlendPlan.fromJson(data);
   }
 
+  /// Theme Blend build step: the agent arranges the plan's scraps on a page.
+  Future<Map<String, dynamic>> agentLayout({
+    required BlendPlan plan,
+    required List<Scrap> scraps,
+  }) {
+    return _postJson('/agent/layout', {
+      'title': plan.title,
+      'layout_intent': plan.layoutIntent,
+      'paper': plan.paper,
+      'scraps': [
+        for (final s in scraps.take(12))
+          {
+            'id': s.id,
+            'aspect': s.height / s.width,
+            'type': s.type,
+            'description': s.description.length > 600
+                ? s.description.substring(0, 600)
+                : s.description,
+          },
+      ],
+      'captions': plan.captions.take(3).toList(),
+    }, timeout: _agentTimeout);
+  }
+
   /// Muse Spark reads a scrap: OCR text, entities, tags, mood, description.
   Future<Map<String, dynamic>> enrich(Uint8List scrapPng) async {
     final request = http.MultipartRequest('POST', _uri('/enrich'))

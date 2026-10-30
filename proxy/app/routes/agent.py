@@ -1,4 +1,4 @@
-"""Theme Blend agent routes (SPEC 4.6). Plan now; build (layout) lands on Day 5."""
+"""Theme Blend agent routes (SPEC 4.6): plan a page, then lay it out."""
 
 from typing import Annotated, Any
 
@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app.agent.archive_search import ScrapSummary
+from app.agent.layout import LayoutScrap
 from app.envelope import ApiError, ok
 from app.providers import Providers
 from app.routes import deps
@@ -48,4 +49,26 @@ def plan(body: PlanRequest, models: Annotated[Providers, Depends(deps.providers)
     if not body.archive:
         raise ApiError(422, "empty_archive", "Scan some scraps first - the agent plans with what's in your archive.")
     result = models.agent.plan(body.theme.strip(), body.pinned_ids, [s.to_summary() for s in body.archive])
+    return ok(result.to_json())
+
+
+class LayoutScrapIn(BaseModel):
+    id: str = Field(min_length=1, max_length=64)
+    aspect: float = Field(gt=0, le=20)
+    type: str = Field(default="other", max_length=32)
+    description: str = Field(default="", max_length=600)
+
+
+class LayoutRequest(BaseModel):
+    title: str = Field(default="", max_length=120)
+    layout_intent: str = Field(default="", max_length=400)
+    paper: str = Field(default="cream", max_length=20)
+    scraps: list[LayoutScrapIn] = Field(min_length=1, max_length=12)
+    captions: list[str] = Field(default_factory=list, max_length=3)
+
+
+@router.post("/layout")
+def layout(body: LayoutRequest, models: Annotated[Providers, Depends(deps.providers)]) -> dict[str, Any]:
+    scraps = [LayoutScrap(id=s.id, aspect=s.aspect, type=s.type, description=s.description) for s in body.scraps]
+    result = models.designer.layout(body.title, body.layout_intent, body.paper, scraps, [c[:120] for c in body.captions])
     return ok(result.to_json())

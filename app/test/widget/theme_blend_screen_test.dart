@@ -51,6 +51,46 @@ Map<String, dynamic> _planJson() => {
   'tool_calls': 3,
 };
 
+Map<String, dynamic> _respond(http.Request request, bool layoutFails) {
+  if (request.url.path != '/agent/layout') return okEnvelope(_planJson());
+  if (layoutFails) {
+    return {
+      'ok': false,
+      'data': null,
+      'error': {'code': 'model_error', 'message': 'down'},
+    };
+  }
+  return okEnvelope({
+    'placements': [
+      {
+        'id': 'r1',
+        'cx': 0.3,
+        'cy': 0.25,
+        'width': 0.5,
+        'rotation_deg': -6,
+        'z': 1,
+      },
+      {
+        'id': 'ghost',
+        'cx': 0.5,
+        'cy': 0.5,
+        'width': 0.3,
+        'rotation_deg': 0,
+        'z': 0,
+      },
+    ],
+    'captions': [
+      {
+        'text': '9:42, still sleepy',
+        'cx': 0.5,
+        'cy': 0.9,
+        'size': 0.06,
+        'rotation_deg': -3,
+      },
+    ],
+  });
+}
+
 void main() {
   setUpAll(() => useGoogleFonts = false);
 
@@ -85,8 +125,9 @@ void main() {
 
   Future<FileJournalRepository> pumpBlend(
     WidgetTester tester,
-    List<http.Request> log,
-  ) async {
+    List<http.Request> log, {
+    bool layoutFails = false,
+  }) async {
     final repository = FileJournalRepository(root);
     final journal = (await tester.runAsync(() => repository.create('Kyoto')))!;
     await tester.pumpWidget(
@@ -95,7 +136,7 @@ void main() {
           proxyClientProvider.overrideWithValue(
             ProxyClient(
               baseUrl: 'http://proxy',
-              httpClient: fakeProxy((_) => okEnvelope(_planJson()), log: log),
+              httpClient: fakeProxy((r) => _respond(r, layoutFails), log: log),
             ),
           ),
           scrapsProvider.overrideWith((ref) async => _archive),
@@ -171,5 +212,38 @@ void main() {
       page.elements.where((e) => e.kind == ElementKind.scrap).single.scrapId,
       'r1',
     );
+    final scrap = page.elements.firstWhere((e) => e.kind == ElementKind.scrap);
+    expect(scrap.cx, closeTo(0.3, 1e-9)); // the agent's placement
+    expect(scrap.size, closeTo(0.5, 1e-9));
+    expect(page.elements.last.text, '9:42, still sleepy');
+    expect(log.where((r) => r.url.path == '/agent/layout'), hasLength(1));
+  });
+
+  testWidgets('if the designer fails, Build still makes a simple page', (
+    tester,
+  ) async {
+    final log = <http.Request>[];
+    final repository = await pumpBlend(tester, log, layoutFails: true);
+    await tester.enterText(find.byType(TextField), 'slow sunday');
+    await tester.tap(find.text('Plan a page'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Build page with 2 scraps'));
+    await tester.pumpAndSettle();
+
+    final journal = await tester.runAsync(() async {
+      await tester.tap(find.text('Build page with 2 scraps'));
+      for (var i = 0; i < 100; i++) {
+        await tester.pump();
+        final j = (await repository.getAll()).single;
+        if (j.pages.length == 2) return j;
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      return null;
+    });
+
+    final scraps = journal!.pages.last.elements.where(
+      (e) => e.kind == ElementKind.scrap,
+    );
+    expect(scraps, hasLength(2)); // simple cascade
   });
 }

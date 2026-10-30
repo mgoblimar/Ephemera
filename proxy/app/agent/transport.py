@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from openai import OpenAI
 
 from app.agent.archive_search import ScrapSummary, search_archive
+from app.agent.layout import TextTransport
 from app.agent.planner import INSTRUCTIONS, SEARCH_TOOL, AgentTransport, AgentTurn, BlendPlan, FunctionCall, PlanScrap
 from app.config import Settings
 from app.providers.meta_client import call_model, log_usage
@@ -57,3 +58,21 @@ class MockPlanner:
             ephemera=({"kind": "stamp", "prompt": f"vintage postage stamp, {theme}"},),
             tool_calls=1,
         )
+
+
+def layout_transport(client: OpenAI, settings: Settings) -> TextTransport:
+    """The layout step is a single JSON answer from the agent model (no tools)."""
+
+    def send(system: str, user: str) -> str:
+        response = call_model(
+            "Agent layout",
+            lambda: client.chat.completions.create(
+                model=settings.agent_model,
+                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                reasoning_effort=AGENT_REASONING_EFFORT,
+            ),
+        )
+        log_usage("Agent layout", settings.agent_model, response.usage)
+        return response.choices[0].message.content or ""
+
+    return send

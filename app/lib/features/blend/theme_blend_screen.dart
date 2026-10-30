@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:ephemera_ai/data/proxy_client.dart';
+import 'package:ephemera_ai/features/blend/agent_layout.dart';
 import 'package:ephemera_ai/features/blend/simple_layout.dart';
 import 'package:ephemera_ai/features/editor/editor_screen.dart';
 import 'package:ephemera_ai/models/blend_plan.dart';
@@ -39,6 +40,7 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
   BlendPlan? _plan;
   Set<String> _dropped = const {};
   bool _planning = false;
+  bool _building = false;
   String? _error;
   int _progress = 0;
   Timer? _ticker;
@@ -102,26 +104,25 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
       for (final s in plan.scraps)
         if (!_dropped.contains(s.id) && byId[s.id] != null) byId[s.id]!,
     ];
-    final page = simpleLayout(
-      pageId: _uuid.v4(),
-      scraps: scraps,
-      captions: plan.captions,
-      paper: paperFromName(plan.paper),
-    );
+    setState(() => _building = true);
+    final page = await _arrange(plan, scraps);
+    if (!mounted) return;
     final journal = widget.journal.withPages([...widget.journal.pages, page]);
     try {
       final repository = await ref.read(journalRepositoryProvider.future);
       await repository.save(journal);
     } on FileSystemException {
       if (mounted) {
-        setState(
-          () => _error = "Couldn't save the new page. Check free storage.",
-        );
+        setState(() {
+          _building = false;
+          _error = "Couldn't save the new page. Check free storage.";
+        });
       }
       return;
     }
     ref.invalidate(journalsProvider);
     if (!mounted) return;
+    setState(() => _building = false);
     unawaited(
       Navigator.pushReplacement(
         context,
@@ -130,6 +131,38 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
         ),
       ),
     );
+  }
+
+  /// The agent arranges the page; if that fails, the simple cascade keeps
+  /// Build working (and says so).
+  Future<JournalPage> _arrange(BlendPlan plan, List<Scrap> scraps) async {
+    final pageId = _uuid.v4();
+    final paper = paperFromName(plan.paper);
+    try {
+      final layout = await ref
+          .read(proxyClientProvider)
+          .agentLayout(plan: plan, scraps: scraps);
+      return pageFromAgentLayout(
+        pageId: pageId,
+        layout: layout,
+        scraps: scraps,
+        paper: paper,
+      );
+    } on ProxyException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Couldn't reach the designer; used a simple layout."),
+          ),
+        );
+      }
+      return simpleLayout(
+        pageId: pageId,
+        scraps: scraps,
+        captions: plan.captions,
+        paper: paper,
+      );
+    }
   }
 
   @override
@@ -188,6 +221,7 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
                         : {..._dropped, id},
                   );
                 }),
+                building: _building,
                 onBuild: () => _build(plan, byId),
               ),
           ],
@@ -231,9 +265,11 @@ class PlanCards extends StatelessWidget {
     required this.dropped,
     required this.onToggle,
     required this.onBuild,
+    this.building = false,
   });
 
   final BlendPlan plan;
+  final bool building;
   final Map<String, Scrap> byId;
   final Set<String> dropped;
   final ValueChanged<String> onToggle;
@@ -293,8 +329,12 @@ class PlanCards extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: FilledButton(
-            onPressed: kept == 0 ? null : onBuild,
-            child: Text('Build page with $kept scrap${kept == 1 ? '' : 's'}'),
+            onPressed: kept == 0 || building ? null : onBuild,
+            child: Text(
+              building
+                  ? 'Arranging your page…'
+                  : 'Build page with $kept scrap${kept == 1 ? '' : 's'}',
+            ),
           ),
         ),
       ],
