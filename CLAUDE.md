@@ -8,13 +8,13 @@ Meta AI hackathon project (Indie track). Snap physical junk-journal scraps, cut 
 |---|---|---|
 | 1 | Oct 29 | ✅ Scaffold, mocks, Muse Wonder tool-calling check |
 | 2 | Oct 30 | ✅ Real SAM + Muse Spark, full-res cutouts, scan session with contact-sheet batching, element Split (quality in backlog) |
-| 3 | Oct 31 | 🟡 Canvas editor, library, page-flip book **committed (12d65c8)**; cut-line check on tablet still pending |
+| 3 | Oct 31 | ✅ Canvas editor, library, page-flip book; **cut line passed on the tablet** |
 | 4 | Nov 1 | Theme system + Desk tokens first (SPEC 4.8 A1), then enrichment (Muse Spark OCR/tags) + agent plan step with `search_archive` |
 | 5 | Nov 2 | Morning: agent builds the page. Afternoon: **UI/UX polish pass** (SPEC 4.8), then Cozy cat theme if time. P2 only if time. **Feature freeze tonight** |
 | 6 | Nov 3 | Demo video only |
 | 7 | Nov 4 | Submit + social posts only |
 
-**Where we stopped:** Day 3 code is committed but `main` is **2 commits ahead of origin** (Split + Day 3 not pushed). The tablet still runs a build *without* the zero-width grid fix — rebuild before testing. Next: the Day 3 cut-line check on the tablet (scan → cut → collage → flip pages), then Day 4.
+**Where we stopped:** Day 3 is done and pushed; the cut line (scan → cut → collage → page flips) passed on the tablet. **Next: Day 4**, starting with the theme system + Desk tokens (SPEC 4.8 A1), then Muse Spark enrichment and the agent plan step.
 
 ## Repo layout
 
