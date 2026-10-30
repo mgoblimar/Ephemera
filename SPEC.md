@@ -247,7 +247,7 @@ Layout is not a tool. It is a final structured-output step: Muse Wonder receives
 
 Tested on the tablet: a "black + gold" Kuromi theme gave a composed page — cut-out figure as the large hero layered over two tilted boxes, stickers at the edges, two captions placed in free space. Backend safety pass (clamp + de-overlap above 35% of the smaller scrap) kept everything on the page.
 
-Tuning (Oct 30, Muse Wonder): plan took ~80 s (6 searches, 3 turns) + layout ~11 s. Now one parallel search round (tools dropped after it) and layout at `minimal` effort: plan ~25 s (4 searches, 2 turns) + layout ~7 s, ~₱4.5 per page, same quality. Still in backlog: the agent only sees text, so weak Split elements can be chosen → hide tiny/low-quality elements from search or let users delete junk scraps. Meta only supports `tool_choice="auto"` (fixed: tools are omitted once the search budget is spent).
+Tuning (Oct 30, Muse Wonder): plan took ~80 s (6 searches, 3 turns) + layout ~11 s. Now one parallel search round (tools dropped after it) and layout at `minimal` effort: plan ~25 s (4 searches, 2 turns) + layout ~7 s, ~₱4.5 per page, same quality. Weak Split elements (done Oct 30): the app no longer sends specks and slivers to the agent (any scrap under 48 px; Split elements under 120×120 px or stretched more than 4:1) and the scrap detail sheet says so; any scrap can be removed from the archive (with Undo; its image stays so existing pages keep it). Meta only supports `tool_choice="auto"` (fixed: tools are omitted once the search budget is spent).
 
 ### 4.6b Generated decorations — live result (Oct 30)
 

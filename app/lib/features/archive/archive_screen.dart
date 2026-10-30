@@ -89,11 +89,32 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
               : ZeroWidthGuard(
                   child: ScrapWall(
                     scraps: shown,
-                    onTap: (s) => showScrapDetail(context, s),
+                    onTap: (s) =>
+                        showScrapDetail(context, s, onRemove: () => _remove(s)),
                   ),
                 ),
         ),
       ],
+    );
+  }
+
+  /// Removes a junk scrap, with a few seconds to change your mind.
+  Future<void> _remove(Scrap scrap) async {
+    final repository = await ref.read(scrapRepositoryProvider.future);
+    await repository.remove(scrap.id);
+    ref.invalidate(scrapsProvider);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Removed the ${scrap.type} from your archive.'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await repository.restore(scrap);
+            ref.invalidate(scrapsProvider);
+          },
+        ),
+      ),
     );
   }
 

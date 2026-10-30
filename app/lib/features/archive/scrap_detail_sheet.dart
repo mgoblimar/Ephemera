@@ -7,7 +7,12 @@ import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/theme.dart';
 
 /// Everything known about one scrap: what Muse Spark read, where it came from.
-Future<void> showScrapDetail(BuildContext context, Scrap scrap) {
+/// [onRemove] adds a "Remove from archive" button (the sheet closes first).
+Future<void> showScrapDetail(
+  BuildContext context,
+  Scrap scrap, {
+  VoidCallback? onRemove,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -15,17 +20,25 @@ Future<void> showScrapDetail(BuildContext context, Scrap scrap) {
       expand: false,
       initialChildSize: 0.75,
       maxChildSize: 0.95,
-      builder: (context, controller) =>
-          _ScrapDetail(scrap: scrap, controller: controller),
+      builder: (context, controller) => _ScrapDetail(
+        scrap: scrap,
+        controller: controller,
+        onRemove: onRemove,
+      ),
     ),
   );
 }
 
 class _ScrapDetail extends StatelessWidget {
-  const _ScrapDetail({required this.scrap, required this.controller});
+  const _ScrapDetail({
+    required this.scrap,
+    required this.controller,
+    this.onRemove,
+  });
 
   final Scrap scrap;
   final ScrollController controller;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -48,10 +61,30 @@ class _ScrapDetail extends StatelessWidget {
             'Added ${added.year}-${_two(added.month)}-${_two(added.day)}',
             if (scrap.splitFromLabel != null)
               'split from a ${scrap.splitFromLabel}',
+            if (scrap.source == ScrapSource.generated) 'made by AI',
             if (!scrap.enriched) 'not read yet',
           ].join(' · '),
           style: TextStyle(color: tokens.inkSoft),
         ),
+        if (scrap.tooWeakForAgent) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.visibility_off_outlined,
+                size: 16,
+                color: tokens.inkSoft,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Too small to use in Theme Blend pages',
+                  style: TextStyle(color: tokens.inkSoft, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ],
         if (scrap.description.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
@@ -106,6 +139,21 @@ class _ScrapDetail extends StatelessWidget {
                   ),
                 ),
             ],
+          ),
+        ],
+        if (onRemove != null) ...[
+          const SizedBox(height: 24),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                onRemove!();
+              },
+              style: TextButton.styleFrom(foregroundColor: tokens.accent),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Remove from archive'),
+            ),
           ),
         ],
       ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ephemera_ai/data/scrap_repository.dart';
 import 'package:ephemera_ai/features/archive/archive_screen.dart';
 import 'package:ephemera_ai/features/archive/archive_wall.dart';
 import 'package:ephemera_ai/features/editor/handwriting.dart';
@@ -33,6 +34,26 @@ final _archive = [
   _scrap('t', 'ticket', mood: ['nostalgic'], ocr: 'Bus P20'),
   _scrap('s', 'sticker', mood: ['cozy', 'playful']),
 ];
+
+/// In-memory archive, so removal runs without file I/O.
+class _MemoryArchive implements ScrapRepository {
+  _MemoryArchive(List<Scrap> scraps) : _scraps = [...scraps];
+
+  final List<Scrap> _scraps;
+
+  @override
+  Future<List<Scrap>> getAll() async => List.unmodifiable(_scraps);
+
+  @override
+  Future<void> remove(String id) async =>
+      _scraps.removeWhere((s) => s.id == id);
+
+  @override
+  Future<void> restore(Scrap scrap) async => _scraps.add(scrap);
+
+  @override
+  Object? noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   setUpAll(() => useGoogleFonts = false);
@@ -103,5 +124,41 @@ void main() {
 
     expect(find.text('A ticket'), findsOneWidget);
     expect(find.text('“Bus P20”'), findsOneWidget);
+  });
+
+  testWidgets('removing a scrap takes it off the wall; undo brings it back', (
+    tester,
+  ) async {
+    final archive = _MemoryArchive(_archive);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          scrapRepositoryProvider.overrideWith((ref) async => archive),
+          scrapsProvider.overrideWith(
+            (ref) async =>
+                (await ref.watch(scrapRepositoryProvider.future)).getAll(),
+          ),
+        ],
+        child: MaterialApp(theme: buildTheme(), home: const ArchiveScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('ticket scrap'));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('Remove from archive'),
+      find.byType(ListView).last,
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Remove from archive'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ScrapCard), findsNWidgets(2));
+    expect(find.text('Removed the ticket from your archive.'), findsOneWidget);
+
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ScrapCard), findsNWidgets(3));
   });
 }

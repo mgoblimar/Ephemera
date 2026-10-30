@@ -135,4 +135,53 @@ void main() {
     expect(scrap.tags, ['tape']);
     expect(scrap.enriched, isFalse);
   });
+
+  test(
+    'remove takes a scrap out but keeps its image; restore undoes it',
+    () async {
+      final repository = FileScrapRepository(root);
+      final saved = await repository.saveCapture(
+        photoJpeg: Uint8List.fromList([1]),
+        cutouts: [_cutout('m0'), _cutout('m1')],
+      );
+      final gone = saved.first;
+
+      await repository.remove(gone.id);
+
+      expect((await repository.getAll()).map((s) => s.id), [saved.last.id]);
+      expect(File(gone.pngPath).existsSync(), isTrue); // pages still show it
+
+      await repository.restore(gone);
+      await repository.restore(gone); // twice is harmless
+
+      expect(
+        (await repository.getAll()).map((s) => s.id).toSet(),
+        saved.map((s) => s.id).toSet(),
+      );
+    },
+  );
+
+  group('tooWeakForAgent', () {
+    Scrap scrap(int w, int h, {bool split = false}) => Scrap(
+      id: 's',
+      pngPath: 'x.png',
+      width: w,
+      height: h,
+      source: ScrapSource.capture,
+      createdAt: DateTime.utc(2026),
+      splitFromLabel: split ? 'wrapper' : null,
+    );
+
+    test('small whole stickers are fine; only specks are hidden', () {
+      expect(scrap(205, 97).tooWeakForAgent, isFalse);
+      expect(scrap(40, 300).tooWeakForAgent, isTrue);
+    });
+
+    test('split slivers and tiny badges are hidden, real elements kept', () {
+      expect(scrap(118, 57, split: true).tooWeakForAgent, isTrue); // badge
+      expect(scrap(60, 343, split: true).tooWeakForAgent, isTrue); // side text
+      expect(scrap(433, 356, split: true).tooWeakForAgent, isFalse); // mascot
+      expect(scrap(109, 333, split: true).tooWeakForAgent, isFalse);
+    });
+  });
 }

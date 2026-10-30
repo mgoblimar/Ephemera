@@ -1,3 +1,12 @@
+import 'dart:math' as math;
+
+/// Scraps smaller than this (px, shorter side) are never offered to the agent.
+const minAgentSide = 48;
+
+/// Split elements also need this much area (px) and at most this stretch.
+const minAgentElementArea = 120 * 120;
+const maxAgentElementStretch = 4.0;
+
 enum ScrapSource { capture, imported, generated }
 
 /// One cut-out piece of ephemera in the archive. Immutable; use [copyWith].
@@ -47,6 +56,17 @@ class Scrap {
   final String? parentScrapId;
 
   bool get isSplitElement => splitFromLabel != null;
+
+  /// Too small or thin to look good on a page (side text, specks of a badge),
+  /// so Theme Blend isn't offered it. Whole pieces only need to be readable.
+  bool get tooWeakForAgent {
+    final short = math.min(width, height);
+    final long = math.max(width, height);
+    if (short < minAgentSide) return true;
+    if (!isSplitElement) return false;
+    return width * height < minAgentElementArea ||
+        long / short > maxAgentElementStretch;
+  }
 
   Scrap copyWith({
     String? type,

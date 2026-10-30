@@ -23,6 +23,13 @@ abstract interface class ScrapRepository {
 
   /// Replaces a stored scrap's metadata (e.g. after enrichment).
   Future<void> update(Scrap scrap);
+
+  /// Takes a scrap out of the archive. Its image file stays, so journal pages
+  /// that already use it keep showing it, and [restore] can undo the removal.
+  Future<void> remove(String id);
+
+  /// Puts a removed scrap back.
+  Future<void> restore(Scrap scrap);
 }
 
 /// Local-only archive: PNG/JPEG files plus a JSON index in the app documents dir.
@@ -156,6 +163,22 @@ class FileScrapRepository implements ScrapRepository {
     await _writeList(_scrapIndex, [
       for (final s in all) s['id'] == scrap.id ? scrap.toJson() : s,
     ]);
+  });
+
+  @override
+  Future<void> remove(String id) => _serially(() async {
+    final all = await _readList(_scrapIndex);
+    await _writeList(_scrapIndex, [
+      for (final s in all)
+        if (s['id'] != id) s,
+    ]);
+  });
+
+  @override
+  Future<void> restore(Scrap scrap) => _serially(() async {
+    final all = await _readList(_scrapIndex);
+    if (all.any((s) => s['id'] == scrap.id)) return;
+    await _writeList(_scrapIndex, [...all, scrap.toJson()]);
   });
 
   Future<List<Map<String, dynamic>>> _readList(File file) async {

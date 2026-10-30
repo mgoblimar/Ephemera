@@ -88,7 +88,7 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
     try {
       final plan = await ref
           .read(proxyClientProvider)
-          .agentPlan(theme: theme, archive: archive);
+          .agentPlan(theme: theme, archive: _offeredToAgent(archive));
       if (!mounted) return;
       setState(() {
         _plan = plan;
@@ -104,6 +104,13 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
       _ticker?.cancel();
       if (mounted) setState(() => _planning = false);
     }
+  }
+
+  /// Leaves out slivers and specks that would look broken on a page, unless
+  /// that would leave the agent nothing to work with.
+  static List<Scrap> _offeredToAgent(List<Scrap> archive) {
+    final usable = archive.where((s) => !s.tooWeakForAgent).toList();
+    return usable.isEmpty ? archive : usable;
   }
 
   Future<void> _build(BlendPlan plan, Map<String, Scrap> byId) async {
