@@ -40,6 +40,7 @@ With 7 days left, the scope is tiered so that each tier is demoable on its own.
 | **P1** | Muse Spark OCR + metadata enrichment | Text, dates and places from scraps |
 | **P1** | **Theme Blend Agent** (Muse Wonder), `search_archive` tool | Plan → approve → build |
 | **P1** | Freehand drawing | Simple pen strokes |
+| **P1** | **UI/UX polish pass** (4.8) | The demo video is judged on looks: style, motion, empty states, app icon |
 | **P2** | Agent `generate_ephemera` tool (Muse Image) | Stamps, tape strips, labels |
 | **P2** | Journal prompts & captions | Reuses the enrichment call; cheap if OCR works |
 | **Stretch** | Import an existing physical journal: **Style Profile only** | One Muse Spark call over page photos, fed to the agent |
@@ -239,6 +240,43 @@ The user photographs pages of a physical journal and imports them into a book. E
 
 The Style Profile is shown to the user (editable chips), and they can toggle it on as an extra input to the Theme Blend Agent ("Match my style").
 
+### 4.8 UI/UX polish (P1, added Day 3)
+
+The features work, but the app still looks like stock Material. The demo video needs it to feel like a **tactile scrapbook studio**, not a settings screen.
+
+**Direction (confirmed):** a **junk-journal desk** feel. Default theme: **Warm editorial scrapbook**.
+- Paper textures everywhere (not flat cream), torn-paper and washi-tape accents.
+- A serif display font for headings, paired with the handwriting fonts already in the editor.
+- Scraps shown as physical objects: soft drop shadows and slight tilts.
+- Terracotta and moss colours carry meaning (selected / action), not just decoration.
+
+**Themes:** the look is a swappable token set (Flutter `ThemeExtension`): colours, display and body fonts, paper texture, decorations (tape, stickers), shadow and tilt. Screens read tokens, never hard-coded colours, so a theme switch restyles the whole app.
+
+| Theme | Feel | Hackathon scope |
+|---|---|---|
+| **Desk** (default) | Warm editorial scrapbook: kraft and cream paper, serif + handwriting, washi tape, terracotta and moss | Build fully (A list below) |
+| **Cozy cat** | Cute and playful, inspired by the mofusand mood: pastels, rounded shapes, original cat-ear and paw doodles, bouncy motion. **Original art only; no mofusand characters, artwork or name** (copyrighted brand). | Second theme if Day 5 allows; else post-hackathon |
+| **Studio** | Clean modern: white, bold type, scraps as the only colour | Post-hackathon |
+| **Vintage** | Moody kraft and ink, aged paper, stamps, typewriter type | Post-hackathon |
+
+A theme picker lives in a small settings sheet (palette icon on the Journals tab). The choice is saved on the device.
+
+**Must-have for the video (A):**
+1. **Theme system + Desk tokens first:** display + body fonts, colour roles, paper texture, shadows, spacing, all as a `ThemeExtension`, so the Day 4–5 screens are built in the style and other themes can be added later.
+2. **Archive** as a scrapbook wall: masonry layout, tilted scraps with shadows, type filter chips.
+3. **Journal shelf:** textured cloth/kraft covers with a spine and title label.
+4. **Editor:** corner handles for scale and rotate (instead of a plain border), a tool bar styled like a strip of washi tape, light haptics on select and drop.
+5. **Scan session:** a nicer "finding pieces…" state (shimmer over the photo), and a short cut-out reveal animation when scraps come back.
+6. **App icon, name and splash screen** ("EphemeraAI"), and friendly empty states with a small illustration.
+
+**Nice-to-have (B):**
+- A real page-curl turn in the book.
+- A hero transition from scrap to canvas.
+- Onboarding with 3 cards.
+- Sound or haptic touches.
+
+**Rules:** no new features in this pass; check every screen at tablet and phone width; keep tap targets ≥48 px; respect reduced motion.
+
 ## 5. Architecture
 
 ```
@@ -416,8 +454,8 @@ Solo build: features are built **vertically** (app screen + its proxy endpoint t
 | **1** ✅ | Done: Flutter app + FastAPI proxy with mocks; capture, mask review, tap-to-add, cut styles, save to the Archive (pulled forward from Day 2); Muse Wonder tool calling confirmed with the real key; SAM/pricing docs read | ✅ Mock hero flow works end to end; 25 proxy + 14 app tests pass |
 | **2** ✅ | Done: real SAM 3.1 + Muse Spark (Plan A chosen); sticker sheets split per sticker; full-resolution cutouts, hole filling, speck removal, scrap types; **scan session with contact-sheet batching** (16 pieces per ₱0.16 request); element detection proven live | ✅ Real cutouts on the tablet; 62 proxy + 19 app tests pass |
 | **3** | Canvas editor (transforms, layers, text, undo/redo, PNG export) + library and book flip (package) | **Cut-line check:** scan → cut → collage works on the tablet |
-| **4** | Enrichment (OCR + tags + palette) + agent plan with `search_archive`, SSE progress, plan cards UI | A theme prompt returns an approvable plan |
-| **5** | Agent build (layout step + validation). If on track: `generate_ephemera`, freehand, prompts (P2). **Feature freeze tonight** | Agent builds a page end-to-end; demo assets cached |
+| **4** | **First hour:** theme system + Desk tokens (4.8 A1). **Then:** enrichment (OCR + tags + palette) + agent plan with `search_archive`, SSE progress, plan cards UI (built in the new style) | A theme prompt returns an approvable plan |
+| **5** | **Morning:** agent build (layout step + validation). **Afternoon:** UI/UX polish pass (4.8 A2–A6), then the Cozy cat theme if time. P2 (`generate_ephemera`, freehand, prompts) only if both are done. **Feature freeze tonight** | Agent builds a page end-to-end; every demo screen polished; demo assets cached |
 | **6** | **Demo video day:** script (section 7), record, edit. Fix only bugs that show up on camera. README with setup steps and a list of the Meta models used | Final video exported |
 | **7** | **Submission & social:** submit the repo + video, post on social media (cut a 30–60 s vertical clip from the video) | Submitted |
 

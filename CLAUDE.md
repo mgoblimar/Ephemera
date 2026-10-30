@@ -9,8 +9,8 @@ Meta AI hackathon project (Indie track). Snap physical junk-journal scraps, cut 
 | 1 | Oct 29 | ✅ Scaffold, mocks, Muse Wonder tool-calling check |
 | 2 | Oct 30 | ✅ Real SAM + Muse Spark, full-res cutouts, scan session with contact-sheet batching, element Split (quality in backlog) |
 | 3 | Oct 31 | 🟡 Canvas editor, library, page-flip book **committed (12d65c8)**; cut-line check on tablet still pending |
-| 4 | Nov 1 | Enrichment (Muse Spark OCR/tags) + agent plan step with `search_archive` |
-| 5 | Nov 2 | Agent builds the page; P2 if time (Muse Image ephemera, freehand). **Feature freeze tonight** |
+| 4 | Nov 1 | Theme system + Desk tokens first (SPEC 4.8 A1), then enrichment (Muse Spark OCR/tags) + agent plan step with `search_archive` |
+| 5 | Nov 2 | Morning: agent builds the page. Afternoon: **UI/UX polish pass** (SPEC 4.8), then Cozy cat theme if time. P2 only if time. **Feature freeze tonight** |
 | 6 | Nov 3 | Demo video only |
 | 7 | Nov 4 | Submit + social posts only |
 
@@ -71,6 +71,10 @@ flutter run -d R52X807YBTD --dart-define=PROXY_URL=http://127.0.0.1:8100        
 - Muse Wonder makes **3–4 parallel tool calls per turn**; every tool call needs its own tool response. Use the **Responses API** for the agent loop (keeps reasoning across turns).
 - Detection uses `reasoning_effort="minimal"` (≈6s); `low` was ~15s.
 - Element Split works for logos/lettering; loose boxes and busy backgrounds are poor → **backlog** (SPEC 4.1b). Refinement taps / edge snapping / "Find…" are **parked** (SPEC 4.1c).
+
+## UI direction
+
+Junk-journal desk feel; default theme **Desk** (warm editorial scrapbook). Themes are swappable `ThemeExtension` token sets (SPEC 4.8). A cute **Cozy cat** theme is wanted, mofusand-*inspired* in mood only: never use mofusand characters, art or name (copyrighted).
 
 ## Gotchas (learned the hard way)
 
