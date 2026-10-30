@@ -94,6 +94,18 @@ class ProxyClient {
     );
   }
 
+  /// Muse Spark reads a scrap: OCR text, entities, tags, mood, description.
+  Future<Map<String, dynamic>> enrich(Uint8List scrapPng) async {
+    final request = http.MultipartRequest('POST', _uri('/enrich'))
+      ..files.add(
+        http.MultipartFile.fromBytes('scrap', scrapPng, filename: 'scrap.png'),
+      );
+    return _send(
+      () async => http.Response.fromStream(await _http.send(request)),
+      timeout: _slowRequestTimeout,
+    );
+  }
+
   /// Detect pieces in a photo without cutting them (cheap: no SAM call).
   Future<ScanPhoto> scanDetect(
     Uint8List photo, {

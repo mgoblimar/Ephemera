@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:ephemera_ai/config.dart';
 import 'package:ephemera_ai/data/proxy_client.dart';
+import 'package:ephemera_ai/data/enrichment_service.dart';
 import 'package:ephemera_ai/data/journal_repository.dart';
 import 'package:ephemera_ai/data/scrap_repository.dart';
 import 'package:ephemera_ai/models/journal.dart';
@@ -37,4 +38,13 @@ final journalRepositoryProvider = FutureProvider<JournalRepository>((
 final journalsProvider = FutureProvider<List<Journal>>((ref) async {
   final repository = await ref.watch(journalRepositoryProvider.future);
   return repository.getAll();
+});
+
+/// Background scrap enrichment; trigger with `enrichPending()` after saving.
+final enrichmentServiceProvider = Provider<EnrichmentService>((ref) {
+  return EnrichmentService(
+    proxy: ref.watch(proxyClientProvider),
+    repository: () => ref.read(scrapRepositoryProvider.future),
+    onUpdated: () => ref.invalidate(scrapsProvider),
+  );
 });

@@ -83,7 +83,7 @@ def parse_detections(
     reply: str, size: tuple[int, int], allowed: tuple[str, ...] = SCRAP_TYPES
 ) -> list[DetectedItem]:
     """Parse the model's JSON, scale boxes to pixels and drop anything malformed."""
-    payload = _extract_json(reply)
+    payload = extract_json(reply)
     if payload is None:
         logger.warning("Detector reply was not JSON: %.200s", reply)
         return []
@@ -92,7 +92,7 @@ def parse_detections(
     return items[:MAX_OBJECTS_PER_REQUEST]
 
 
-def _extract_json(reply: str) -> object | None:
+def extract_json(reply: str) -> object | None:
     """Accept bare JSON or JSON wrapped in a markdown code fence."""
     fenced = re.search(r"```(?:json)?\s*(.*?)```", reply, re.DOTALL)
     text = fenced.group(1) if fenced else reply

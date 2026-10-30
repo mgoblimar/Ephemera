@@ -16,6 +16,9 @@ abstract interface class ScrapRepository {
     required Uint8List photoJpeg,
     required List<CutoutScrap> cutouts,
   });
+
+  /// Replaces a stored scrap's metadata (e.g. after enrichment).
+  Future<void> update(Scrap scrap);
 }
 
 /// Local-only archive: PNG/JPEG files plus a JSON index in the app documents dir.
@@ -31,6 +34,16 @@ class FileScrapRepository implements ScrapRepository {
   final Directory _root;
   final Uuid _uuid;
   final DateTime Function() _clock;
+
+  /// Writes run one at a time: saving a scan and enrichment updates both
+  /// read-modify-write the index, and must not overwrite each other.
+  Future<void> _writes = Future.value();
+
+  Future<T> _serially<T>(Future<T> Function() action) {
+    final result = _writes.then((_) => action());
+    _writes = result.then((_) {}, onError: (_) {});
+    return result;
+  }
 
   File get _scrapIndex => File(p.join(_root.path, 'scraps.json'));
   File get _captureIndex => File(p.join(_root.path, 'captures.json'));
@@ -48,7 +61,12 @@ class FileScrapRepository implements ScrapRepository {
   Future<List<Scrap>> saveCapture({
     required Uint8List photoJpeg,
     required List<CutoutScrap> cutouts,
-  }) async {
+  }) => _serially(() => _saveCapture(photoJpeg, cutouts));
+
+  Future<List<Scrap>> _saveCapture(
+    Uint8List photoJpeg,
+    List<CutoutScrap> cutouts,
+  ) async {
     await _scrapDir.create(recursive: true);
     await _captureDir.create(recursive: true);
     final now = _clock();
@@ -93,6 +111,14 @@ class FileScrapRepository implements ScrapRepository {
     ]);
     return List.unmodifiable(scraps);
   }
+
+  @override
+  Future<void> update(Scrap scrap) => _serially(() async {
+    final all = await _readList(_scrapIndex);
+    await _writeList(_scrapIndex, [
+      for (final s in all) s['id'] == scrap.id ? scrap.toJson() : s,
+    ]);
+  });
 
   Future<List<Map<String, dynamic>>> _readList(File file) async {
     if (!await file.exists()) return const [];

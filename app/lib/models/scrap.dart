@@ -17,6 +17,7 @@ class Scrap {
     this.palette = const [],
     this.description = '',
     this.enriched = false,
+    this.entities = const {},
   });
 
   final String id;
@@ -34,6 +35,9 @@ class Scrap {
   final String description;
   final bool enriched;
 
+  /// Read from the scrap by Muse Spark: date, time, place, brand, price.
+  final Map<String, String> entities;
+
   Scrap copyWith({
     String? type,
     List<String>? tags,
@@ -42,6 +46,7 @@ class Scrap {
     List<String>? palette,
     String? description,
     bool? enriched,
+    Map<String, String>? entities,
   }) {
     return Scrap(
       id: id,
@@ -58,6 +63,7 @@ class Scrap {
       palette: palette ?? this.palette,
       description: description ?? this.description,
       enriched: enriched ?? this.enriched,
+      entities: entities ?? this.entities,
     );
   }
 
@@ -76,6 +82,7 @@ class Scrap {
     'palette': palette,
     'description': description,
     'enriched': enriched,
+    'entities': entities,
   };
 
   factory Scrap.fromJson(Map<String, dynamic> json) {
@@ -94,6 +101,11 @@ class Scrap {
       palette: _strings(json['palette']),
       description: json['description'] as String? ?? '',
       enriched: json['enriched'] as bool? ?? false,
+      entities: Map.unmodifiable(
+        (json['entities'] as Map<String, dynamic>? ?? const {}).map(
+          (k, v) => MapEntry(k, v.toString()),
+        ),
+      ),
     );
   }
 }

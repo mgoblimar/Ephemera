@@ -120,10 +120,10 @@ def sam_transport(client: OpenAI, settings: Settings) -> SamTransport:
     return send
 
 
-def vision_transport(client: OpenAI, settings: Settings) -> VisionTransport:
+def vision_transport(client: OpenAI, settings: Settings, what: str = "Item detection") -> VisionTransport:
     def send(system: str, text: str, image: Image.Image) -> str:
         response = call_model(
-            "Item detection",
+            what,
             lambda: client.chat.completions.create(
                 model=settings.vision_model,
                 messages=[
@@ -139,7 +139,7 @@ def vision_transport(client: OpenAI, settings: Settings) -> VisionTransport:
                 reasoning_effort=DETECTION_REASONING_EFFORT,
             ),
         )
-        log_usage("Item detection", settings.vision_model, response.usage)
+        log_usage(what, settings.vision_model, response.usage)
         return response.choices[0].message.content or ""
 
     return send

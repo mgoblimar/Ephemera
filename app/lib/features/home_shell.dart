@@ -1,18 +1,29 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ephemera_ai/features/archive/archive_screen.dart';
 import 'package:ephemera_ai/features/library/library_screen.dart';
+import 'package:ephemera_ai/providers.dart';
 
 /// Bottom navigation between journals and the scrap archive.
-class HomeShell extends StatefulWidget {
+class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
   @override
-  State<HomeShell> createState() => _HomeShellState();
+  ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell> {
   int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Catch up on scraps saved before enrichment existed or while offline.
+    unawaited(ref.read(enrichmentServiceProvider).enrichPending());
+  }
 
   @override
   Widget build(BuildContext context) {

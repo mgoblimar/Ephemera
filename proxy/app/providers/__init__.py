@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from app.config import Settings
 from app.providers.base import SegmentationProvider, VisionLLMProvider
 from app.providers.detector import SparkItemDetector
+from app.providers.enricher import SparkEnricher
 from app.providers.meta_client import build_client
 from app.providers.mock import MockSegmentationProvider, MockVisionLLMProvider
 from app.providers.real import RealSegmentationProvider, sam_transport, vision_transport
@@ -26,5 +27,5 @@ def build_providers(settings: Settings) -> Providers:
         detector=SparkItemDetector(vision_transport(client, settings)),
         strategy=settings.auto_detect_strategy,
     )
-    # Enrichment (OCR/tags) gets its real Muse Spark adapter on Day 4; mocked until then.
-    return Providers(segmentation=segmentation, vision=MockVisionLLMProvider(), mode="real")
+    vision = SparkEnricher(vision_transport(client, settings, what="Enrichment"))
+    return Providers(segmentation=segmentation, vision=vision, mode="real")

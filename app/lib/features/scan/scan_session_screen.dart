@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -198,6 +199,8 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
       saved += scraps.length;
     }
     ref.invalidate(scrapsProvider);
+    // Read the new scraps' text and tags in the background (~₱0.01 each).
+    unawaited(ref.read(enrichmentServiceProvider).enrichPending());
     return saved;
   }
 

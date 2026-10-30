@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:ephemera_ai/data/enrichment_service.dart';
 import 'package:ephemera_ai/data/proxy_client.dart';
 import 'package:ephemera_ai/data/scrap_repository.dart';
 import 'package:ephemera_ai/features/capture/photo_source.dart';
@@ -52,6 +53,14 @@ Widget _app(http.Client client, ScrapRepository repository) => ProviderScope(
       ProxyClient(baseUrl: 'http://proxy', httpClient: client),
     ),
     scrapRepositoryProvider.overrideWith((ref) async => repository),
+    // No background enrichment in these tests (it would outlive the test).
+    enrichmentServiceProvider.overrideWithValue(
+      EnrichmentService(
+        proxy: ProxyClient(baseUrl: 'http://proxy', httpClient: client),
+        repository: () async => throw const FileSystemException('off'),
+        onUpdated: () {},
+      ),
+    ),
   ],
   child: const MaterialApp(home: ScanSessionScreen(photoPicker: _fakePick)),
 );
