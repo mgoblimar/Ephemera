@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 MAX_TOOL_CALLS = 8
 MAX_TURNS = 6
+MAX_SEARCH_ROUNDS = 1  # one parallel round, then the plan: every extra turn costs Wonder ~15-50 s
 MAX_PLAN_SCRAPS = 8
 MAX_CAPTIONS = 3
 MAX_EPHEMERA = 4
@@ -44,7 +45,8 @@ SEARCH_TOOL = {
 }
 
 INSTRUCTIONS = f"""You are Theme Blend, a junk-journal page designer working with the user's real scraps.
-1. Search the archive with search_archive (several phrasings: objects, moods, colours) to find scraps for the theme.
+1. Search the archive once: make 3-5 search_archive calls together in your first reply (different phrasings: objects,
+moods, colours). You won't get to search again, so cover the theme in that one go.
 2. Choose {3}-{MAX_PLAN_SCRAPS} scraps that belong together on one page. Always include pinned scraps.
 3. Reply with only this JSON:
 {{"title": short page title,
@@ -108,7 +110,7 @@ class BlendPlanner:
         prompt = f"Theme: {theme}\nPinned scraps (must use): {json.dumps(pinned)}\nArchive size: {len(archive)} scraps."
         turn = self._transport([{"role": "user", "content": prompt}], None, True)
         used = 0
-        for _ in range(MAX_TURNS):
+        for rounds in range(1, MAX_TURNS + 1):
             if not turn.calls:
                 break
             outputs = []
@@ -119,7 +121,8 @@ class BlendPlanner:
                 else:
                     result = {"error": "Search limit reached. Write the plan now with what you found."}
                 outputs.append({"type": "function_call_output", "call_id": call.call_id, "output": json.dumps(result)})
-            turn = self._transport(outputs, turn.response_id, used < MAX_TOOL_CALLS)
+            allow_tools = used < MAX_TOOL_CALLS and rounds < MAX_SEARCH_ROUNDS
+            turn = self._transport(outputs, turn.response_id, allow_tools)
         logger.info("Agent plan finished after %d tool calls", used)
         return parse_plan(turn.text, theme, seen, used)
 

@@ -12,6 +12,9 @@ from app.config import Settings
 from app.providers.meta_client import call_model, log_usage
 
 AGENT_REASONING_EFFORT = "low"  # planning; keeps a plan well under the 20 s target
+# Layout is placement arithmetic the backend clamps and de-overlaps anyway; at "low"
+# Wonder spent ~1.1k reasoning tokens (billed as output) on it.
+LAYOUT_REASONING_EFFORT = "minimal"
 
 
 def agent_transport(client: OpenAI, settings: Settings) -> AgentTransport:
@@ -70,7 +73,7 @@ def layout_transport(client: OpenAI, settings: Settings) -> TextTransport:
             lambda: client.chat.completions.create(
                 model=settings.agent_model,
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-                reasoning_effort=AGENT_REASONING_EFFORT,
+                reasoning_effort=LAYOUT_REASONING_EFFORT,
             ),
         )
         log_usage("Agent layout", settings.agent_model, response.usage)

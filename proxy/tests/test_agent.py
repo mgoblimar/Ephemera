@@ -88,6 +88,14 @@ def test_tool_calls_beyond_the_limit_are_answered_with_an_error() -> None:
     assert plan.tool_calls == MAX_TOOL_CALLS
 
 
+def test_tools_are_dropped_after_one_round_of_searches() -> None:
+    model = ScriptedModel([AgentTurn("resp1", (_call("c1", "coffee"),), ""), AgentTurn("resp2", (), "{}")])
+
+    BlendPlanner(model).plan("coffee", [], ARCHIVE)
+
+    assert [allow for *_, allow in model.sent] == [True, False]
+
+
 def test_pinned_scraps_can_be_planned_without_being_searched() -> None:
     model = ScriptedModel([AgentTurn("resp1", (), json.dumps({"scraps": [{"id": "t1", "reason": "pinned"}]}))])
 

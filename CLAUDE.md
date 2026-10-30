@@ -14,7 +14,7 @@ Meta AI hackathon project (Indie track). Snap physical junk-journal scraps, cut 
 | 6 | Nov 3 | Demo video only |
 | 7 | Nov 4 | Submit + social posts only |
 
-**Where we stopped:** Day 5 afternoon polish done (archive wall + filters, cloth covers, editor corner handle + washi toolbar, scan shimmer/reveal, piece review sheet, app icon + splash). Scan tuning started (SPEC 4.1b "Scan tuning"): pixel-coordinate boxes, stricter detect/split prompts, solidity junk filter, `scripts/scan_eval.py` test run. **Next:** Cozy cat theme if time; switch AGENT_MODEL to muse-wonder-1.0 and re-test before recording; more scan tuning (glossy "photo" elements, shadows in boxes) only if time.
+**Where we stopped:** Day 5 afternoon polish done (archive wall + filters, cloth covers, editor corner handle + washi toolbar, scan shimmer/reveal, piece review sheet, app icon + splash). Scan tuning started (SPEC 4.1b "Scan tuning"): pixel-coordinate boxes, stricter detect/split prompts, solidity junk filter, `scripts/scan_eval.py` test run. `AGENT_MODEL=muse-wonder-1.0` is now set in `.env` and tested on the emulator (Oct 30): after limiting the planner to one parallel search round and running layout at `minimal`, plan ~25 s + layout ~7 s, ~₱4.5 per page (was ~80 s + 11 s, ~₱7). **Next:** Cozy cat theme if time; more scan tuning (glossy "photo" elements, shadows in boxes) only if time.
 
 ## Repo layout
 
