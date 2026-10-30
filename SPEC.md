@@ -84,6 +84,34 @@ With 7 days left, the scope is tiered so that each tier is demoable on its own.
 5. On **Save**, each kept mask becomes a **Scrap**: a cropped RGBA PNG with a 1–2 px feathered alpha so deckle edges and translucent tape stay intact.
 6. The scraps land in the Archive under a new "Capture" group, and enrichment (4.3) runs in the background.
 
+#### 4.1a Scan session (built Day 2; replaces steps 2–5 as the main flow)
+
+Cutting costs ₱0.16 per SAM request (pesos at ₱64/USD), so the flow splits finding pieces from cutting them:
+
+1. **Scan:** add any number of photos. Each goes only to Muse Spark detection (`/scan/detect`, ~₱0.01). Pieces show as thumbnail tiles, all ticked by default.
+2. **Choose:** untick pieces not worth keeping. The cost line shows `N chosen · R cut requests · ≈₱X`.
+3. **Cut once:** `/scan/cut` crops each chosen piece from its full-size photo, packs up to 16 onto a **contact sheet** and sends it to SAM as **one** request. Masks are mapped back and cut at full resolution, and saved grouped per photo.
+
+Measured: 14 pieces from 3 photos = 1 billed image (`images_processed=1`), same quality as cutting per photo. Five photos with 12 kept pieces cost ~₱0.22, versus ~₱0.96 with one SAM call per photo.
+
+The Day 1 review screen (tap-to-add, refine) is kept in the code but not reachable. Refinement is parked (see 4.1c).
+
+#### 4.1b Split into design elements (next: Day 3 morning)
+
+A scrap often holds smaller designs worth cutting out on their own: the SUMO lettering on a wrapper, the oval logo on a paper bag, a character on a box. Sometimes the whole item is wanted, sometimes just a piece of it, sometimes both.
+
+- A **Split** button on each piece tile sends a close-up crop of that piece to Muse Spark (`detect_elements`, ~₱0.01). Spark returns elements labelled `logo · lettering · illustration · badge · character · pattern · photo`.
+- Elements appear as extra tiles under their parent. Any mix of whole items and elements is cut in the same batched request (16 per SAM call). Default cut style for elements: **Sticker**.
+- Live test (Day 2): Jamaican bag logo and pattie came out as clean die-cut stickers. Sumo lettering, badge and cookies were good after **speck removal** (`drop_islands` keeps parts ≥15% of the largest). The cream box missed its hero jar illustration, so the prompt needs "include the main illustration even if large".
+
+#### 4.1c Parked: refinement
+
+These are batched too, with all pending edits in one SAM request:
+- Add/erase taps and drag-a-box on a piece.
+- Duplicate a piece to make variants (figure only vs figure + board).
+- A "Find…" word search (SAM concept prompt, 1 word per request).
+- Edge snapping.
+
 **Acceptance criteria**
 - A photo with 3–6 items yields at least one usable cutout per item without manual tapping in most cases.
 - Translucent washi tape keeps partial alpha, not a hard 0/1 mask (where SAM's output allows it).
@@ -375,8 +403,8 @@ Solo build: features are built **vertically** (app screen + its proxy endpoint t
 | Day | Build | End-of-day check |
 |---|---|---|
 | **1** ✅ | Done: Flutter app + FastAPI proxy with mocks; capture, mask review, tap-to-add, cut styles, save to the Archive (pulled forward from Day 2); Muse Wonder tool calling confirmed with the real key; SAM/pricing docs read | ✅ Mock hero flow works end to end; 25 proxy + 14 app tests pass |
-| **2** | Real providers behind `USE_REAL_PROVIDERS`: SAM 3.1 adapter (box + point prompts, `meta-sam-parser` decode, upsample + feather masks); Muse Spark detection (boxes + labels) for auto-detect Plan A; test Plan A vs Plan B on 3 real desk photos; confirm contributor mode accepts images; first run on the tablet | Real cutouts of real scraps in the Archive, on the tablet |
-| **3** | Canvas editor (transforms, layers, text, undo/redo, PNG export) + library and book flip (package) | **Cut-line check:** the full hero flow works on the device |
+| **2** ✅ | Done: real SAM 3.1 + Muse Spark (Plan A chosen); sticker sheets split per sticker; full-resolution cutouts, hole filling, speck removal, scrap types; **scan session with contact-sheet batching** (16 pieces per ₱0.16 request); element detection proven live | ✅ Real cutouts on the tablet; 62 proxy + 19 app tests pass |
+| **3** | **Morning (~1 h):** Split button (4.1b) + hero-illustration prompt tweak. **Then:** canvas editor (transforms, layers, text, undo/redo, PNG export) + library and book flip (package) | **Cut-line check:** scan → cut → collage works on the tablet |
 | **4** | Enrichment (OCR + tags + palette) + agent plan with `search_archive`, SSE progress, plan cards UI | A theme prompt returns an approvable plan |
 | **5** | Agent build (layout step + validation). If on track: `generate_ephemera`, freehand, prompts (P2). **Feature freeze tonight** | Agent builds a page end-to-end; demo assets cached |
 | **6** | **Demo video day:** script (section 7), record, edit. Fix only bugs that show up on camera. README with setup steps and a list of the Meta models used | Final video exported |
