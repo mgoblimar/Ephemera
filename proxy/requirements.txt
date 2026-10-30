@@ -4,4 +4,7 @@ python-multipart>=0.0.9
 pydantic-settings>=2.4
 pillow>=10.4
 numpy>=1.26
+scipy>=1.13
 openai>=1.40
+# Pinned: app/providers/sam.py uses its internal one-pass mask decoder.
+meta-sam-parser==0.1.0

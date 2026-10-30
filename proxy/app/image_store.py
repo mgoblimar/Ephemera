@@ -19,9 +19,14 @@ from app.envelope import ApiError
 
 @dataclass(frozen=True)
 class StoredImage:
-    image: Image.Image
+    image: Image.Image  # working copy the models see (max_image_side)
     created_at: float
     masks: Mapping[str, np.ndarray] = field(default_factory=lambda: MappingProxyType({}))
+    original: Image.Image | None = None  # full-resolution upright photo, used for cutouts
+
+    @property
+    def full(self) -> Image.Image:
+        return self.original or self.image
 
 
 class ImageStore:
@@ -31,11 +36,11 @@ class ImageStore:
         self._entries: dict[str, StoredImage] = {}
         self._lock = Lock()
 
-    def put(self, image: Image.Image) -> str:
+    def put(self, image: Image.Image, original: Image.Image | None = None) -> str:
         image_id = uuid.uuid4().hex
         with self._lock:
             self._evict_expired()
-            self._entries[image_id] = StoredImage(image=image, created_at=self._clock())
+            self._entries[image_id] = StoredImage(image=image, created_at=self._clock(), original=original)
         return image_id
 
     def get(self, image_id: str) -> StoredImage:

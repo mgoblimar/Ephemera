@@ -2,7 +2,7 @@ import numpy as np
 from PIL import Image
 
 from app.image_store import ImageStore
-from app.imaging import apply_cut_style, dominant_palette, mask_bbox
+from app.imaging import apply_cut_style, cut_from_original, dominant_palette, fill_holes, mask_bbox
 from app.providers.mock import ellipse_mask
 
 PHOTO = Image.new("RGB", (300, 200), (40, 90, 160))
@@ -49,6 +49,48 @@ def test_sticker_border_is_white_around_the_object() -> None:
 def test_margin_border_keeps_the_photo_background() -> None:
     margin = apply_cut_style(PHOTO, ALPHA, "margin", "l")
     assert tuple(_first_opaque_pixel_in_middle_row(margin)[:3]) == (40, 90, 160)
+
+
+def test_fill_holes_closes_gaps_inside_a_mask() -> None:
+    ring = ALPHA.copy()
+    ring[90:110, 140:160] = 0.0  # a "glare" hole in the middle
+
+    filled = fill_holes(ring)
+
+    assert filled[100, 150] == 1.0
+    assert filled[0, 0] == 0.0  # outside stays outside
+
+
+def test_sticker_cut_has_no_white_blob_where_the_mask_had_a_hole() -> None:
+    holey = ALPHA.copy()
+    holey[90:110, 140:160] = 0.0
+
+    sticker = np.asarray(apply_cut_style(PHOTO, holey, "sticker", "m"))
+
+    center = sticker[sticker.shape[0] // 2, sticker.shape[1] // 2]
+    assert tuple(center) == (40, 90, 160, 255)  # photo color, not white
+
+
+def test_cut_from_original_scales_the_mask_up_to_full_resolution() -> None:
+    original = Image.new("RGB", (900, 600), (40, 90, 160))  # 3x the 300x200 working photo
+
+    scrap = cut_from_original(original, (300, 200), ALPHA, "tight", "m")
+    small = apply_cut_style(PHOTO, ALPHA, "tight", "m")
+
+    # Fixed padding/feather pixels don't scale, so compare ratios loosely.
+    assert 2.7 <= scrap.width / small.width <= 3.1
+    assert 2.7 <= scrap.height / small.height <= 3.1
+
+
+def test_cut_from_original_keeps_border_width_relative_to_the_full_photo() -> None:
+    original = Image.new("RGB", (900, 600), (40, 90, 160))
+    _, _, outline_width, _ = mask_bbox(ALPHA)  # solid (>0.5) outline on the working photo
+
+    margin = cut_from_original(original, (300, 200), ALPHA, "margin", "l")
+
+    border = 0.02 * 900  # "l" is 2% of the full photo's long side, measured from the solid outline
+    grown_per_side = (margin.width - outline_width * 3) / 2
+    assert border <= grown_per_side <= border + 6  # + feather and crop padding
 
 
 def test_dominant_palette_orders_by_frequency() -> None:

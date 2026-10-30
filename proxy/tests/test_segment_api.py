@@ -40,6 +40,16 @@ def test_auto_segment_downscales_large_photos(client: TestClient) -> None:
     assert max(data["width"], data["height"]) == 1536
 
 
+def test_cutouts_come_from_the_full_resolution_photo(client: TestClient) -> None:
+    data = client.post("/segment/auto", files={"image": ("big.png", photo_bytes((3000, 2000), fmt="PNG"), "image/png")}).json()["data"]
+    mask = data["masks"][0]
+
+    scrap = client.post("/cutout", json={"image_id": data["image_id"], "mask_ids": [mask["id"]]}).json()["data"]["scraps"][0]
+
+    working_width = mask["bbox"][2]  # mask bbox on the 1536px working photo
+    assert scrap["width"] > working_width * 1.8  # cut from the 3072px original, ~2x sharper
+
+
 def test_rejects_non_image_upload(client: TestClient) -> None:
     response = client.post("/segment/auto", files={"image": ("notes.txt", b"hello", "text/plain")})
     assert response.status_code == 415

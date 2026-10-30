@@ -6,7 +6,8 @@ const proxyUrl = String.fromEnvironment(
   defaultValue: 'http://10.0.2.2:8000',
 );
 
-/// Picker re-encodes photos to at most this size before upload (the proxy
-/// downscales to 1536 px anyway, so larger uploads only waste bandwidth).
-const maxCaptureSide = 2048.0;
+/// Picker re-encodes photos to at most this size before upload. The proxy's
+/// models see a 1536 px copy, but scraps are cut from this full-size photo,
+/// so it matches the proxy's max_original_side.
+const maxCaptureSide = 3072.0;
 const captureJpegQuality = 90;

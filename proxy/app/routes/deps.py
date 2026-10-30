@@ -19,7 +19,10 @@ def image_store(request: Request) -> ImageStore:
     return request.app.state.image_store
 
 
-async def read_image_upload(upload: UploadFile, config: Settings, keep_alpha: bool = False) -> Image.Image:
+async def read_image_upload(
+    upload: UploadFile, config: Settings, keep_alpha: bool = False, max_side: int | None = None
+) -> Image.Image:
     # Read one byte past the limit so oversized files are rejected without buffering them fully.
     data = await upload.read(config.max_upload_bytes + 1)
-    return load_upload(data, config.max_upload_bytes, config.max_image_side, keep_alpha=keep_alpha)
+    side = config.max_image_side if max_side is None else max_side
+    return load_upload(data, config.max_upload_bytes, side, keep_alpha=keep_alpha)

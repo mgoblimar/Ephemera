@@ -29,6 +29,7 @@ void main() {
       expect(result.imageId, 'img1');
       expect(result.masks.map((m) => m.id), ['m0', 'm1']);
       expect(result.masks[1].bbox, const Rect.fromLTWH(110, 20, 80, 60));
+      expect(result.masks[0].label, 'sticker');
       expect(result.photoJpeg, base64Decode(tinyPngBase64));
     });
 

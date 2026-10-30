@@ -12,11 +12,15 @@ class MaskCandidate {
     required this.bbox,
     required this.score,
     required this.previewPng,
+    this.label,
   });
 
   final String id;
   final Rect bbox;
   final double score;
+
+  /// Scrap type the detector suggested, e.g. "sticker"; null for tap-added masks.
+  final String? label;
 
   /// White RGBA image of the mask, cropped to [bbox], tinted by the app.
   final Uint8List previewPng;
@@ -65,6 +69,7 @@ class CutoutScrap {
     required this.width,
     required this.height,
     required this.palette,
+    this.label,
   });
 
   final String maskId;
@@ -72,4 +77,16 @@ class CutoutScrap {
   final int width;
   final int height;
   final List<String> palette;
+
+  /// Scrap type carried over from the mask it was cut from.
+  final String? label;
+
+  CutoutScrap withLabel(String? label) => CutoutScrap(
+    maskId: maskId,
+    png: png,
+    width: width,
+    height: height,
+    palette: palette,
+    label: label,
+  );
 }

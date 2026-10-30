@@ -107,10 +107,11 @@ class _CaptureReviewScreenState extends ConsumerState<CaptureReviewScreen> {
         style: _style,
         size: _size,
       );
+      final labels = {for (final m in result.masks) m.id: m.label};
       final repository = await ref.read(scrapRepositoryProvider.future);
       final saved = await repository.saveCapture(
         photoJpeg: result.photoJpeg,
-        cutouts: cutouts,
+        cutouts: [for (final c in cutouts) c.withLabel(labels[c.maskId])],
       );
       ref.invalidate(scrapsProvider);
       if (mounted) Navigator.pop(context, saved.length);

@@ -12,3 +12,5 @@ __pycache__/
 .vscode/
 .DS_Store
 Thumbs.db
+proxy/segment_check_out/
+proxy/test_photos/

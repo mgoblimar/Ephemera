@@ -150,6 +150,7 @@ class ProxyClient {
       ),
       score: (json['score'] as num).toDouble(),
       previewPng: base64Decode(json['preview_png'] as String),
+      label: json['label'] as String?,
     );
   }
 }

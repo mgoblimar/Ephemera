@@ -13,7 +13,7 @@ from app.image_store import ImageStore
 from app.imaging import (
     CutSize,
     CutStyle,
-    apply_cut_style,
+    cut_from_original,
     dominant_palette,
     jpeg_bytes,
     mask_area_fraction,
@@ -55,9 +55,15 @@ def _b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
-def _mask_json(mask_id: str, alpha: np.ndarray, score: float) -> dict[str, Any]:
+def _mask_json(mask_id: str, alpha: np.ndarray, score: float, label: str | None = None) -> dict[str, Any]:
     x, y, w, h = mask_bbox(alpha) or (0, 0, 0, 0)
-    return {"id": mask_id, "bbox": [x, y, w, h], "score": round(score, 3), "preview_png": _b64(mask_preview_png(alpha))}
+    return {
+        "id": mask_id,
+        "bbox": [x, y, w, h],
+        "score": round(score, 3),
+        "label": label,
+        "preview_png": _b64(mask_preview_png(alpha)),
+    }
 
 
 @router.post("/segment/auto")
@@ -67,9 +73,12 @@ async def segment_auto(
     models: Annotated[Providers, Depends(deps.providers)],
     store: Annotated[ImageStore, Depends(deps.image_store)],
 ) -> dict[str, Any]:
-    photo = await deps.read_image_upload(image, config)
+    original = await deps.read_image_upload(image, config, max_side=config.max_original_side)
+    # Models work on a smaller copy (faster, cheaper); scraps are cut from the original.
+    photo = original.copy()
+    photo.thumbnail((config.max_image_side, config.max_image_side))
     masks = [m for m in models.segmentation.auto_masks(photo) if mask_area_fraction(m.alpha) >= MIN_MASK_AREA_FRACTION]
-    image_id = store.put(photo)
+    image_id = store.put(photo, original=original)
     mask_ids = store.add_masks(image_id, [m.alpha for m in masks])
     width, height = photo.size
     return ok(
@@ -79,7 +88,7 @@ async def segment_auto(
             "height": height,
             # The upright, downscaled photo the masks refer to, so the app's overlay always lines up.
             "photo_jpeg": _b64(jpeg_bytes(photo)),
-            "masks": [_mask_json(mid, m.alpha, m.score) for mid, m in zip(mask_ids, masks, strict=True)],
+            "masks": [_mask_json(mid, m.alpha, m.score, m.label) for mid, m in zip(mask_ids, masks, strict=True)],
         }
     )
 
@@ -98,7 +107,7 @@ def segment_point(
     if mask_bbox(mask.alpha) is None:
         raise ApiError(422, "empty_mask", "Nothing found at that spot. Try tapping closer to the item.")
     (mask_id,) = store.add_masks(body.image_id, [mask.alpha])
-    return ok({"mask": _mask_json(mask_id, mask.alpha, mask.score)})
+    return ok({"mask": _mask_json(mask_id, mask.alpha, mask.score, mask.label)})
 
 
 @router.post("/cutout")
@@ -110,7 +119,7 @@ def cutout(body: CutoutRequest, store: Annotated[ImageStore, Depends(deps.image_
 
     scraps = []
     for mask_id in body.mask_ids:
-        scrap = apply_cut_style(entry.image, entry.masks[mask_id], body.cut_style, body.cut_size)
+        scrap = cut_from_original(entry.full, entry.image.size, entry.masks[mask_id], body.cut_style, body.cut_size)
         scraps.append(
             {
                 "mask_id": mask_id,

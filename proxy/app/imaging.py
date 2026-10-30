@@ -9,6 +9,7 @@ from typing import Literal
 
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
+from scipy.ndimage import binary_fill_holes
 
 from app.envelope import ApiError
 
@@ -87,10 +88,63 @@ def feather(alpha: np.ndarray, radius: float = FEATHER_RADIUS) -> np.ndarray:
     return np.asarray(image.filter(ImageFilter.GaussianBlur(radius)), dtype=np.float32) / 255
 
 
-def apply_cut_style(image: Image.Image, alpha: np.ndarray, style: CutStyle, size: CutSize) -> Image.Image:
-    """Cut a scrap out of the photo as a cropped RGBA image in the requested style."""
+def fill_holes(alpha: np.ndarray) -> np.ndarray:
+    """Fill enclosed gaps (e.g. glare the model left out) - real scraps rarely have holes."""
+    filled = binary_fill_holes(alpha > MASK_THRESHOLD)
+    return np.maximum(alpha, filled.astype(np.float32))
+
+
+def border_px(size: CutSize, photo_size: tuple[int, int]) -> float:
+    return CUT_SIZE_FRACTION[size] * max(photo_size)
+
+
+def cut_from_original(
+    original: Image.Image,
+    working_size: tuple[int, int],
+    alpha: np.ndarray,
+    style: CutStyle,
+    size: CutSize,
+) -> Image.Image:
+    """Apply a mask found on the small working photo to the full-resolution original.
+
+    Only the region around the mask is scaled up and processed, so a big photo stays fast.
+    """
+    bbox = mask_bbox(alpha, threshold=0.01)
+    if bbox is None:
+        raise ApiError(422, "empty_mask", "The mask is empty.")
+    scale = original.width / working_size[0]
+    border = border_px(size, original.size)
+    pad = border * 2 + FEATHER_RADIUS * 4 + CROP_PADDING  # room for the dilated border and feather
+    x, y, w, h = bbox
+    left = max(0, int(x * scale - pad))
+    top = max(0, int(y * scale - pad))
+    right = min(original.width, int((x + w) * scale + pad) + 1)
+    bottom = min(original.height, int((y + h) * scale + pad) + 1)
+
+    mask_image = Image.fromarray((np.clip(alpha, 0, 1) * 255).astype(np.uint8), "L")
+    region_mask = mask_image.resize(
+        (right - left, bottom - top),
+        Image.Resampling.BILINEAR,
+        box=(left / scale, top / scale, right / scale, bottom / scale),
+    )
+    region_alpha = np.asarray(region_mask, dtype=np.float32) / 255
+    return apply_cut_style(original.crop((left, top, right, bottom)), region_alpha, style, size, border=border)
+
+
+def apply_cut_style(
+    image: Image.Image,
+    alpha: np.ndarray,
+    style: CutStyle,
+    size: CutSize,
+    border: float | None = None,
+) -> Image.Image:
+    """Cut a scrap out of the photo as a cropped RGBA image in the requested style.
+
+    `border` overrides the sticker/margin width in pixels (needed when `image` is a crop).
+    """
     rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
-    border = CUT_SIZE_FRACTION[size] * max(image.size)
+    border = border_px(size, image.size) if border is None else border
+    alpha = fill_holes(alpha)
 
     if style == "tight":
         out_rgb, out_alpha = rgb, feather(alpha)

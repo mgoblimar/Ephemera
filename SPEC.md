@@ -58,7 +58,19 @@ With 7 days left, the scope is tiered so that each tier is demoable on its own.
 2. The app uploads the image to the proxy, which auto-detects the items. SAM 3.1 has no "segment everything" mode, so the proxy detects in two steps:
    - **Plan A (default):** Muse Spark looks at the photo and returns a box and a type label (ticket, receipt, botanical, tape, …) for each item. All boxes, up to 16, then go to SAM 3.1 as box prompts in **one** request. This gives masks plus labels for about $0.007 per photo.
    - **Plan B (fallback if Spark's boxes are poor):** send several concept prompts (`"ticket"`, `"receipt"`, `"flower"`, `"washi tape"`, `"sticker"`, `"paper"`) to SAM in parallel, then merge overlapping masks. About $0.015 per photo.
-   - Pick between them on Day 2 by testing both on 3 real desk photos.
+   - **Decided on Day 2: Plan A.** It was tested live on 3 real photos (5 mixed scraps; a printed box; a white paper bag on a white surface):
+
+     | | Plan A | Plan B |
+     |---|---|---|
+     | 5 mixed scraps | all 5, plus a box edge at the photo's border | all 5 |
+     | Printed box | found | **missed**: no matching word |
+     | White bag on white | one clean cutout | bag, **plus 2 printed logos** wrongly cut out |
+     | Cost per photo | ~$0.003 | ~$0.02 |
+     | Time per photo | ~10 s (Spark ~6 s, SAM ~4 s, decode ~1 s) | ~3–6 s (8 requests in parallel) |
+
+     Plan B only finds what's on its word list, and junk-journal scraps can be anything. Plan B stays available as `AUTO_DETECT_STRATEGY=concepts`.
+   - Cutout quality from SAM is excellent: torn and zig-zag edges are followed precisely, and low contrast (white on white) is no problem.
+   - Speed-ups still to try for Plan A: send Spark a smaller image (~768 px); try `reasoning_effort="none"`. Spark uses ~260 reasoning tokens at `minimal`, and ~450–980 at `low`.
 3. The Review screen overlays every candidate mask, each with a checkbox. The user can:
    - **Keep or discard** each candidate.
    - **Tap** an uncovered area to add a new mask (point prompt).
@@ -389,8 +401,9 @@ Solo build: features are built **vertically** (app screen + its proxy endpoint t
 ## 10. Open Questions
 
 - ~~**SAM cutout edges:** hard or soft?~~ **Resolved:** binary (hard) masks at a lower resolution than the photo. The proxy upsamples and feathers them. Washi tape won't keep real translucency in the MVP.
-- **Auto-detect:** does Plan A (Muse Spark boxes → SAM box prompts) find scraps reliably on real desk photos, or do we need Plan B? Test on Day 2.
-- SAM image size limit and latency (not documented).
+- ~~**Auto-detect:** Plan A or Plan B?~~ **Resolved:** Plan A (see 4.1 for the test results).
+- ~~Does contributor mode accept images?~~ **Resolved:** yes. `muse-spark-1.3-contributor` handled all three photos.
+- SAM latency: **resolved**, 1.5–3.7 s per request at 1536 px. SAM's image size limit is still undocumented; 1536 px works.
 - ~~**Muse Wonder and tools:** native tool calling or a JSON fallback?~~ **Resolved:** native tool calling is supported (see 5.1), so no JSON fallback is needed. Still to do: one live test call with the hackathon key on Day 1.
 - ~~Muse Image pricing?~~ **Resolved:** $0.01 per returned image (see 5.1).
 - ~~Muse Spark model ID?~~ **Resolved:** `muse-spark-1.3`, same endpoint and key (see 5.1).

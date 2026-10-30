@@ -17,6 +17,7 @@ Map<String, dynamic> maskJson(String id, List<int> bbox) => {
   'id': id,
   'bbox': bbox,
   'score': 0.9,
+  'label': 'sticker',
   'preview_png': tinyPngBase64,
 };
 

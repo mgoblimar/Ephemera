@@ -72,6 +72,7 @@ class FileScrapRepository implements ScrapRepository {
           createdAt: now,
           captureId: captureId,
           palette: cutout.palette,
+          type: cutout.label ?? 'other',
         ),
       );
     }

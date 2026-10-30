@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -19,8 +21,12 @@ class Settings(BaseSettings):
     sam_model: str = "sam-3.1"  # cutouts: box prompts (auto-detect) and point prompts (taps)
     image_model: str = "muse-image-1.0"  # generated stamps, tape, labels
 
+    # How auto-detect finds items (SPEC 4.1): "spark_boxes" = Plan A, "concepts" = Plan B.
+    auto_detect_strategy: Literal["spark_boxes", "concepts"] = "spark_boxes"
+
     max_upload_bytes: int = 10 * 1024 * 1024
-    max_image_side: int = 1536
+    max_image_side: int = 1536  # what the models see
+    max_original_side: int = 3072  # what scraps are cut from
     image_ttl_seconds: int = 900
     rate_limit_per_minute: int = 60
 

@@ -2,7 +2,11 @@ from dataclasses import dataclass
 
 from app.config import Settings
 from app.providers.base import SegmentationProvider, VisionLLMProvider
+from app.providers.detector import SparkItemDetector
+from app.providers.meta_client import build_client
 from app.providers.mock import MockSegmentationProvider, MockVisionLLMProvider
+from app.providers.real import RealSegmentationProvider, sam_transport, vision_transport
+from app.providers.sam import SamClient
 
 
 @dataclass(frozen=True)
@@ -13,7 +17,14 @@ class Providers:
 
 
 def build_providers(settings: Settings) -> Providers:
-    if settings.use_real_providers:
-        # Real SAM 3.1 / Muse adapters land on Day 2-4 once the hackathon API shapes are confirmed.
-        raise RuntimeError("Real providers are not implemented yet. Set USE_REAL_PROVIDERS=false.")
-    return Providers(segmentation=MockSegmentationProvider(), vision=MockVisionLLMProvider(), mode="mock")
+    if not settings.use_real_providers:
+        return Providers(segmentation=MockSegmentationProvider(), vision=MockVisionLLMProvider(), mode="mock")
+
+    client = build_client(settings)
+    segmentation = RealSegmentationProvider(
+        sam=SamClient(sam_transport(client, settings)),
+        detector=SparkItemDetector(vision_transport(client, settings)),
+        strategy=settings.auto_detect_strategy,
+    )
+    # Enrichment (OCR/tags) gets its real Muse Spark adapter on Day 4; mocked until then.
+    return Providers(segmentation=segmentation, vision=MockVisionLLMProvider(), mode="real")

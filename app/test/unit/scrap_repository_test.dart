@@ -51,8 +51,21 @@ void main() {
       expect(reloaded.map((s) => s.id).toSet(), saved.map((s) => s.id).toSet());
       expect(reloaded.first.source, ScrapSource.capture);
       expect(reloaded.first.palette, ['#C8B496']);
+      expect(reloaded.map((s) => s.type).toSet(), {'other'});
     },
   );
+
+  test('saveCapture stores the detected scrap type', () async {
+    final repository = FileScrapRepository(root);
+
+    final saved = await repository.saveCapture(
+      photoJpeg: Uint8List(1),
+      cutouts: [_cutout('m0').withLabel('sticker')],
+    );
+
+    expect(saved.single.type, 'sticker');
+    expect((await FileScrapRepository(root).getAll()).single.type, 'sticker');
+  });
 
   test('getAll lists newest scraps first', () async {
     var now = DateTime.utc(2026, 10, 29, 9);

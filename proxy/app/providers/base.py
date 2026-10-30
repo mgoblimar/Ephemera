@@ -20,6 +20,7 @@ class PointPrompt:
 class Mask:
     alpha: np.ndarray  # (height, width) float32 in [0, 1]
     score: float
+    label: str | None = None  # scrap type when known, e.g. "ticket"
 
 
 @dataclass(frozen=True)
