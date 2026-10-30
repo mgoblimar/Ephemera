@@ -9,12 +9,12 @@ Meta AI hackathon project (Indie track). Snap physical junk-journal scraps, cut 
 | 1 | Oct 29 | ✅ Scaffold, mocks, Muse Wonder tool-calling check |
 | 2 | Oct 30 | ✅ Real SAM + Muse Spark, full-res cutouts, scan session with contact-sheet batching, element Split (quality in backlog) |
 | 3 | Oct 31 | ✅ Canvas editor, library, page-flip book; **cut line passed on the tablet** |
-| 4 | Nov 1 | Theme system + Desk tokens first (SPEC 4.8 A1), then enrichment (Muse Spark OCR/tags) + agent plan step with `search_archive` |
+| 4 | Nov 1 | ✅ Theme system, live Muse Spark enrichment, Theme Blend plan step (done a day early, Oct 30) |
 | 5 | Nov 2 | Morning: agent builds the page. Afternoon: **UI/UX polish pass** (SPEC 4.8) incl. archive filters (SPEC 4.2), then Cozy cat theme if time. P2 only if time. **Feature freeze tonight** |
 | 6 | Nov 3 | Demo video only |
 | 7 | Nov 4 | Submit + social posts only |
 
-**Where we stopped:** Day 3 is done and pushed; the cut line (scan → cut → collage → page flips) passed on the tablet. **Next: Day 4**, starting with the theme system + Desk tokens (SPEC 4.8 A1), then Muse Spark enrichment and the agent plan step.
+**Where we stopped:** Day 4 is done and verified live on the tablet (Oct 30, a day ahead). Theme Blend plans pages from the enriched archive; **Build page uses a stand-in cascade that overlaps scraps**. **Next: Day 5 morning:** the agent layout step (positions/sizes/rotation/z from real scrap aspect ratios, validated, no heavy overlaps); afternoon: UI polish + archive filters (SPEC 4.8, 4.2).
 
 ## Repo layout
 
