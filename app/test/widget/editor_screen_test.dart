@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ephemera_ai/data/journal_repository.dart';
 import 'package:ephemera_ai/features/editor/editor_screen.dart';
 import 'package:ephemera_ai/features/editor/handwriting.dart';
+import 'package:ephemera_ai/features/editor/strokes.dart';
 import 'package:ephemera_ai/models/journal.dart';
 import 'package:ephemera_ai/providers.dart';
 
@@ -107,6 +108,31 @@ void main() {
       tester.getSize(find.text('grow me')).width,
       greaterThan(before.width * 1.5),
     );
+  });
+
+  testWidgets('drawing adds a stroke you can undo', (tester) async {
+    await pumpEditor(tester);
+    await tester.tap(find.text('Draw'));
+    await tester.pumpAndSettle();
+    expect(find.text('Done'), findsOneWidget);
+
+    final page = tester.getCenter(find.byType(DrawLayer));
+    final pen = await tester.startGesture(page);
+    for (var i = 0; i < 10; i++) {
+      await pen.moveBy(const Offset(8, 4));
+      await tester.pump();
+    }
+    await pen.up();
+    await tester.pumpAndSettle();
+    expect(find.byType(StrokeView), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Undo'));
+    await tester.pumpAndSettle();
+    expect(find.byType(StrokeView), findsNothing);
+
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(find.text('Draw'), findsOneWidget);
   });
 
   testWidgets('delete removes the selected element; undo restores it', (

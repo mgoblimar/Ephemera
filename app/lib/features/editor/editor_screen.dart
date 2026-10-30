@@ -15,6 +15,7 @@ import 'package:ephemera_ai/features/doodles.dart';
 import 'package:ephemera_ai/features/editor/editor_sheets.dart';
 import 'package:ephemera_ai/features/editor/page_canvas.dart';
 import 'package:ephemera_ai/features/editor/page_history.dart';
+import 'package:ephemera_ai/features/editor/strokes.dart';
 import 'package:ephemera_ai/models/journal.dart';
 import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/providers.dart';
@@ -47,6 +48,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   /// What's on screen; ahead of `_history.current` only mid-gesture.
   late JournalPage _live = _history.current;
   String? _selectedId;
+
+  /// Draw mode: the pen is on, strokes are added as they're finished.
+  bool _drawing = false;
+  double _penWidth = penWidths[1];
+  Color? _penColor; // null: the theme's ink
   final _boundaryKey = GlobalKey();
   final _random = math.Random();
   static const _uuid = Uuid();
@@ -172,6 +178,22 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     if (id != null) _commit(_live.reordering(id, delta));
   }
 
+  void _startDrawing() => setState(() {
+    _selectedId = null;
+    _drawing = true;
+  });
+
+  void _addStroke(List<Offset> points, Size pageSize) {
+    final element = strokeElement(
+      id: _uuid.v4(),
+      points: points,
+      pageSize: pageSize,
+      thickness: _penWidth * pageSize.width,
+      color: _penColor ?? context.tokens.ink,
+    );
+    if (element != null) _commit(_live.adding(element));
+  }
+
   void _cyclePaper() {
     const styles = PaperStyle.values;
     _commit(_live.withPaper(styles[(_live.paper.index + 1) % styles.length]));
@@ -257,20 +279,42 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                         ),
                       ],
                     ),
-                    child: RepaintBoundary(
-                      key: _boundaryKey,
-                      child: JournalPageCanvas(
-                        page: _live,
-                        selectedId: _selectedId,
-                        onSelect: (id) => setState(() => _selectedId = id),
-                        onChanged: _onElementChanged,
-                      ),
+                    child: Stack(
+                      children: [
+                        RepaintBoundary(
+                          key: _boundaryKey,
+                          child: JournalPageCanvas(
+                            page: _live,
+                            selectedId: _selectedId,
+                            onSelect: (id) => setState(() => _selectedId = id),
+                            onChanged: _onElementChanged,
+                          ),
+                        ),
+                        if (_drawing)
+                          Positioned.fill(
+                            child: DrawLayer(
+                              thickness: _penWidth,
+                              color: _penColor ?? context.tokens.ink,
+                              onStroke: _addStroke,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
-            if (_selected != null)
+            if (_drawing)
+              _WashiStrip(
+                child: DrawBar(
+                  thickness: _penWidth,
+                  color: _penColor ?? context.tokens.ink,
+                  onThickness: (w) => setState(() => _penWidth = w),
+                  onColor: (c) => setState(() => _penColor = c),
+                  onDone: () => setState(() => _drawing = false),
+                ),
+              )
+            else if (_selected != null)
               _SelectionBar(
                 isText: _selected!.kind == ElementKind.text,
                 onForward: () => _reorderSelected(1),
@@ -283,6 +327,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
               _ToolBar(
                 onScrap: _addScrap,
                 onText: _addText,
+                onDraw: _startDrawing,
                 onPaper: _cyclePaper,
               ),
           ],
@@ -296,11 +341,13 @@ class _ToolBar extends StatelessWidget {
   const _ToolBar({
     required this.onScrap,
     required this.onText,
+    required this.onDraw,
     required this.onPaper,
   });
 
   final VoidCallback onScrap;
   final VoidCallback onText;
+  final VoidCallback onDraw;
   final VoidCallback onPaper;
 
   @override
@@ -315,6 +362,7 @@ class _ToolBar extends StatelessWidget {
             onTap: onScrap,
           ),
           _Tool(icon: Icons.edit_outlined, label: 'Text', onTap: onText),
+          _Tool(icon: Icons.gesture, label: 'Draw', onTap: onDraw),
           _Tool(icon: Icons.texture, label: 'Paper', onTap: onPaper),
         ],
       ),

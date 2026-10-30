@@ -202,7 +202,7 @@ Single page with a fixed aspect ratio (A5 portrait, 1:1.414) and a paper backgro
 | Transform | Drag, pinch-scale, two-finger rotate; snapping off by default |
 | Layering | Bring forward/back, to front/back; layer list sheet |
 | Text | Handwriting-style fonts (3–5 bundled Google Fonts, e.g. Caveat, Homemade Apple, Reenie Beanie), color, size |
-| Freehand | Pen with 3 widths and color picker; strokes are elements (movable, deletable) |
+| Freehand | ✅ Built Oct 30: Draw tool, 3 pen widths, 5 colours (theme ink/accent/secondary + blue, gold); each stroke is an element (move, scale, rotate, copy, delete, undo) |
 | History | Undo/redo stack (≥ 50 steps), command pattern over immutable page state |
 | Export | Page → PNG at 2× resolution, saved to the gallery or shared via the share sheet |
 | Insert | From the Archive (bottom sheet), from a prompt suggestion, from generated ephemera |

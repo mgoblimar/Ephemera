@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:ephemera_ai/features/editor/handwriting.dart';
+import 'package:ephemera_ai/features/editor/strokes.dart';
 import 'package:ephemera_ai/models/journal.dart';
 import 'package:ephemera_ai/theme.dart';
 
@@ -309,6 +310,8 @@ class ElementView extends StatelessWidget {
                       ColoredBox(color: context.tokens.paperDeep),
                 ),
         );
+      case ElementKind.stroke:
+        return StrokeView(element: element, width: element.size * pageWidth);
       case ElementKind.text:
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),

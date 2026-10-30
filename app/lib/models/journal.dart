@@ -7,7 +7,7 @@ const pageAspect = 1.414;
 
 enum PaperStyle { cream, kraft, dots }
 
-enum ElementKind { scrap, text }
+enum ElementKind { scrap, text, stroke }
 
 /// Handwriting fonts offered for text (Google Fonts family names).
 const handwritingFonts = ['Caveat', 'Homemade Apple', 'Reenie Beanie'];
@@ -28,6 +28,8 @@ class PageElement {
     this.text = '',
     this.font = 'Caveat',
     this.color = 0xFF2F2A26,
+    this.points = const [],
+    this.penWidth = 0,
   });
 
   final String id;
@@ -37,8 +39,8 @@ class PageElement {
   final double cx;
   final double cy;
 
-  /// Scrap: width as a fraction of page width. Text: font size as a fraction
-  /// of page width.
+  /// Scrap and stroke: width as a fraction of page width. Text: font size as
+  /// a fraction of page width.
   final double size;
 
   /// Radians, clockwise.
@@ -47,12 +49,19 @@ class PageElement {
   final String? scrapId;
   final String? imagePath;
 
-  /// Scrap image height / width.
+  /// Scrap image (or stroke box) height / width.
   final double imageAspect;
 
   final String text;
   final String font;
   final int color;
+
+  /// Stroke: x, y pairs as fractions of the element's width (y runs to
+  /// [imageAspect]), so the drawing scales with the element.
+  final List<double> points;
+
+  /// Stroke: pen thickness as a fraction of the element's width.
+  final double penWidth;
 
   PageElement copyWith({
     double? cx,
@@ -76,6 +85,8 @@ class PageElement {
       text: text ?? this.text,
       font: font ?? this.font,
       color: color ?? this.color,
+      points: points,
+      penWidth: penWidth,
     );
   }
 
@@ -92,6 +103,10 @@ class PageElement {
     'text': text,
     'font': font,
     'color': color,
+    if (kind == ElementKind.stroke) ...{
+      'points': [for (final v in points) (v * 10000).round() / 10000],
+      'pen_width': penWidth,
+    },
   };
 
   factory PageElement.fromJson(Map<String, dynamic> json) => PageElement(
@@ -107,6 +122,11 @@ class PageElement {
     text: json['text'] as String? ?? '',
     font: json['font'] as String? ?? 'Caveat',
     color: json['color'] as int? ?? 0xFF2F2A26,
+    points: List.unmodifiable([
+      for (final v in json['points'] as List<dynamic>? ?? const [])
+        (v as num).toDouble(),
+    ]),
+    penWidth: (json['pen_width'] as num? ?? 0).toDouble(),
   );
 }
 

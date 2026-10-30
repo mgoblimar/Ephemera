@@ -14,7 +14,7 @@ Meta AI hackathon project (Indie track). Snap physical junk-journal scraps, cut 
 | 6 | Nov 3 | Demo video only |
 | 7 | Nov 4 | Submit + social posts only |
 
-**Where we stopped:** Day 5 afternoon polish done (archive wall + filters, cloth covers, editor corner handle + washi toolbar, scan shimmer/reveal, piece review sheet, app icon + splash). Scan tuning started (SPEC 4.1b "Scan tuning"): pixel-coordinate boxes, stricter detect/split prompts, solidity junk filter, `scripts/scan_eval.py` test run. `AGENT_MODEL=muse-wonder-1.0` is now set in `.env` and tested on the emulator (Oct 30): after limiting the planner to one parallel search round and running layout at `minimal`, plan ~25 s + layout ~7 s, ~₱4.5 per page (was ~80 s + 11 s, ~₱7). Cozy cat theme built (palette button on Journals; choice saved in settings.json). **Next:** more scan tuning (glossy "photo" elements, shadows in boxes) only if time.
+**Where we stopped:** Day 5 afternoon polish done (archive wall + filters, cloth covers, editor corner handle + washi toolbar, scan shimmer/reveal, piece review sheet, app icon + splash). Scan tuning started (SPEC 4.1b "Scan tuning"): pixel-coordinate boxes, stricter detect/split prompts, solidity junk filter, `scripts/scan_eval.py` test run. `AGENT_MODEL=muse-wonder-1.0` is now set in `.env` and tested on the emulator (Oct 30): after limiting the planner to one parallel search round and running layout at `minimal`, plan ~25 s + layout ~7 s, ~₱4.5 per page (was ~80 s + 11 s, ~₱7). Cozy cat theme built (palette button on Journals; choice saved in settings.json). Freehand drawing built (editor Draw tool; each stroke is an `ElementKind.stroke` element). Tablet testing of scan tuning + Wonder agent still pending. **Next:** generated decorations (P2), archive extras, then more scan tuning (glossy "photo" elements, shadows in boxes) only if time.
 
 ## Repo layout
 
@@ -44,7 +44,7 @@ app/         Flutter Android app (Riverpod 2.x, local JSON + PNG storage)
 USE_REAL_PROVIDERS=true .venv/Scripts/python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8100   # real models
 
 # app (from app/)
-dart format lib test && flutter analyze && flutter test  # 67 tests
+dart format lib test && flutter analyze && flutter test  # 74 tests
 adb reverse tcp:8100 tcp:8100
 flutter run -d R52X807YBTD --dart-define=PROXY_URL=http://127.0.0.1:8100        # tablet over USB
 ```
