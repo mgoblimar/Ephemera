@@ -34,8 +34,12 @@ SCRAP_TYPES = (
 )
 MIN_BOX_FRACTION = 0.01  # drop boxes smaller than 1% of the photo's width or height
 
-# Boxes are asked for in pixels of the image as sent, with its size stated: on known test shapes
-# Spark was within ~15 px this way, but up to 3% off on a 0-1000 grid for portrait photos.
+# Boxes are asked for in pixels of the image as sent, with its size stated (a 0-1000 grid was up
+# to 3% off on portrait photos). Even so, Spark puts boxes too LOW: on known rectangles (Oct 31) the
+# top and bottom came back +28..+57 px (once +89) at 1536 px, in ~28 px steps (its patch grid?),
+# while left/right were within a few px. Real 16:9 tablet scans showed the same: tops started
+# below the piece and bottoms ran into its shadow. So y is shifted back up by about one step.
+Y_BIAS_FRACTION = 0.02  # of the image's longer side (~31 px at 1536)
 SYSTEM_PROMPT = "You locate physical objects in photos precisely and reply with JSON only."
 DETECT_PROMPT = """This photo is {width}x{height} pixels and shows junk-journal materials.
 List every separate piece a journaler could peel off or cut out and use on its own:
@@ -125,8 +129,9 @@ def _to_item(raw: object, size: tuple[int, int], allowed: tuple[str, ...]) -> De
     if not (isinstance(box, list) and len(box) == 4 and all(isinstance(v, int | float) for v in box)):
         return None
     width, height = size
+    y_bias = Y_BIAS_FRACTION * max(width, height)
     x1, x2 = (round(max(0.0, min(float(v), width))) for v in (box[0], box[2]))
-    y1, y2 = (round(max(0.0, min(float(v), height))) for v in (box[1], box[3]))
+    y1, y2 = (round(max(0.0, min(float(v) - y_bias, height))) for v in (box[1], box[3]))
     left, right = sorted((x1, x2))
     top, bottom = sorted((y1, y2))
     if right - left < MIN_BOX_FRACTION * width or bottom - top < MIN_BOX_FRACTION * height:

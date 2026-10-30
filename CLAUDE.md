@@ -70,7 +70,7 @@ flutter run -d R52X807YBTD --dart-define=PROXY_URL=http://127.0.0.1:8100        
 - SAM output parsing uses our fast regex parser + `meta_sam_parser._mask_codec._decode_raster` (internal, single pass); `meta-sam-parser==0.1.0` is **pinned** for that reason. Masks are binary and lower-res than the box.
 - Muse Wonder makes **3–4 parallel tool calls per turn**; every tool call needs its own tool response. Use the **Responses API** for the agent loop (keeps reasoning across turns).
 - Detection uses `reasoning_effort="minimal"` (≈6s); `low` was ~15s.
-- **Spark boxes are asked for in pixels with the image size in the prompt** (0–1000 grid was up to 3% off on portrait photos). Cut-outs with mask solidity < 0.6 are dropped as `rough`.
+- **Spark boxes are asked for in pixels with the image size in the prompt** (0–1000 grid was up to 3% off on portrait photos), and **y is shifted up by 2% of the long side** (Spark draws boxes ~28–57 px too low; `detector.Y_BIAS_FRACTION`). Don't loosen SAM's box prompt: it grabs sticker backing cards. Cut-outs with mask solidity < 0.6 are dropped as `rough`.
 - **Meta's Responses API only accepts `tool_choice="auto"`** — to stop tool use, omit `tools` instead (agent transport does this when the 8-search budget is spent).
 - Element Split works for logos/lettering; loose boxes and busy backgrounds are poor → **backlog** (SPEC 4.1b). Refinement taps / edge snapping / "Find…" are **parked** (SPEC 4.1c).
 

@@ -1,18 +1,19 @@
 from PIL import Image
 
-from app.providers.detector import SparkItemDetector, parse_detections
+from app.providers.detector import Y_BIAS_FRACTION, SparkItemDetector, parse_detections
 from app.providers.sam import PixelBox
 
 SIZE = (400, 300)
+BIAS = round(Y_BIAS_FRACTION * 400)  # Spark's boxes sit this low; parsing moves them back up
 
 
-def test_boxes_are_read_as_pixels() -> None:
+def test_boxes_are_read_as_pixels_and_moved_up_by_sparks_bias() -> None:
     reply = '{"items": [{"label": "ticket", "box": [40, 60, 200.4, 180]}]}'
 
     (item,) = parse_detections(reply, SIZE)
 
     assert item.label == "ticket"
-    assert item.box == PixelBox(left=40, top=60, right=200, bottom=180)
+    assert item.box == PixelBox(left=40, top=60 - BIAS, right=200, bottom=180 - BIAS)
 
 
 def test_prompts_state_the_image_size_in_pixels() -> None:
@@ -34,7 +35,7 @@ def test_accepts_json_inside_a_code_fence() -> None:
 def test_unknown_label_becomes_other_and_swapped_corners_are_fixed() -> None:
     (item,) = parse_detections('{"items": [{"label": "spaceship", "box": [240, 180, 40, 30]}]}', SIZE)
     assert item.label == "other"
-    assert item.box == PixelBox(left=40, top=30, right=240, bottom=180)
+    assert item.box == PixelBox(left=40, top=30 - BIAS, right=240, bottom=180 - BIAS)
 
 
 def test_drops_malformed_and_tiny_boxes_and_clamps_out_of_range() -> None:
