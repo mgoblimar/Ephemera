@@ -14,7 +14,7 @@ Meta AI hackathon project (Indie track). Snap physical junk-journal scraps, cut 
 | 6 | Nov 3 | Demo video only |
 | 7 | Nov 4 | Submit + social posts only |
 
-**Where we stopped:** Day 4 is done and verified live on the tablet (Oct 30, a day ahead). Theme Blend plans pages from the enriched archive; **Build page uses a stand-in cascade that overlaps scraps**. **Next: Day 5 morning:** the agent layout step (positions/sizes/rotation/z from real scrap aspect ratios, validated, no heavy overlaps); afternoon: UI polish + archive filters (SPEC 4.8, 4.2).
+**Where we stopped:** Day 5 morning done: the agent layout step works live (hero scrap, layering, captions placed; backend clamps + de-overlaps). Known: plan ~32 s + layout ~15 s (tune effort/turns); weak Split elements can be picked (agent sees text only). **Next: Day 5 afternoon** — UI polish + archive filters (SPEC 4.8 A2–A6, 4.2), then Cozy cat theme if time; switch AGENT_MODEL to muse-wonder-1.0 and re-test before recording.
 
 ## Repo layout
 
@@ -70,6 +70,7 @@ flutter run -d R52X807YBTD --dart-define=PROXY_URL=http://127.0.0.1:8100        
 - SAM output parsing uses our fast regex parser + `meta_sam_parser._mask_codec._decode_raster` (internal, single pass); `meta-sam-parser==0.1.0` is **pinned** for that reason. Masks are binary and lower-res than the box.
 - Muse Wonder makes **3–4 parallel tool calls per turn**; every tool call needs its own tool response. Use the **Responses API** for the agent loop (keeps reasoning across turns).
 - Detection uses `reasoning_effort="minimal"` (≈6s); `low` was ~15s.
+- **Meta's Responses API only accepts `tool_choice="auto"`** — to stop tool use, omit `tools` instead (agent transport does this when the 8-search budget is spent).
 - Element Split works for logos/lettering; loose boxes and busy backgrounds are poor → **backlog** (SPEC 4.1b). Refinement taps / edge snapping / "Find…" are **parked** (SPEC 4.1c).
 
 ## Archive filters (SPEC 4.2)

@@ -20,13 +20,14 @@ def agent_transport(client: OpenAI, settings: Settings) -> AgentTransport:
             "model": settings.agent_model,
             "instructions": INSTRUCTIONS,
             "input": items,
-            "tools": [SEARCH_TOOL],
             "reasoning": {"effort": AGENT_REASONING_EFFORT},
         }
+        # Meta's API only supports tool_choice="auto", so once the search budget is
+        # spent we stop offering the tool instead of sending tool_choice="none".
+        if allow_tools:
+            kwargs["tools"] = [SEARCH_TOOL]
         if previous_id:
             kwargs["previous_response_id"] = previous_id
-        if not allow_tools:
-            kwargs["tool_choice"] = "none"
         response = call_model("Agent plan", lambda: client.responses.create(**kwargs))
         log_usage("Agent plan", settings.agent_model, getattr(response, "usage", None))
         calls = tuple(

@@ -235,6 +235,12 @@ Layout is not a tool. It is a final structured-output step: Muse Wonder receives
 
 **Acceptance:** a theme prompt against an archive of 20 or more scraps yields a plan in under 20 s and a built page in under 60 s, and the page is visibly on-theme in palette and content.
 
+### 4.6a Layout step — live result (Day 5)
+
+Tested on the tablet: a "black + gold" Kuromi theme gave a composed page — cut-out figure as the large hero layered over two tilted boxes, stickers at the edges, two captions placed in free space. Backend safety pass (clamp + de-overlap above 35% of the smaller scrap) kept everything on the page.
+
+Tuning backlog: plan took ~32 s (6 searches, 3 turns) + layout ~15 s → try `minimal` effort for layout and fewer planner turns; the agent only sees text, so weak Split elements can be chosen → hide tiny/low-quality elements from search or let users delete junk scraps. Meta only supports `tool_choice="auto"` (fixed: tools are omitted once the search budget is spent).
+
 ### 4.7 Import Existing Journal (Stretch: Style Profile only; rest post-hackathon)
 
 For the hackathon, only output 3 (Style Profile) is in scope, as a stretch goal. Outputs 1 and 2 are the post-hackathon roadmap.

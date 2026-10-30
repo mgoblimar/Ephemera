@@ -116,3 +116,27 @@ def test_plan_route_rejects_an_empty_archive(client: TestClient) -> None:
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "empty_archive"
+
+
+def test_transport_never_sends_tool_choice_and_drops_tools_when_budget_is_spent() -> None:
+    from types import SimpleNamespace
+
+    from app.agent.transport import agent_transport
+    from tests.conftest import make_settings
+
+    sent: list[dict] = []
+
+    class FakeResponses:
+        def create(self, **kwargs: object) -> SimpleNamespace:
+            sent.append(kwargs)
+            return SimpleNamespace(id="r", output=[], output_text="{}", usage=None)
+
+    client = SimpleNamespace(responses=FakeResponses())
+    send = agent_transport(client, make_settings())  # type: ignore[arg-type]
+
+    send([{"role": "user", "content": "x"}], None, True)
+    send([], "r", False)
+
+    assert all("tool_choice" not in kwargs for kwargs in sent)  # Meta only accepts "auto"
+    assert "tools" in sent[0] and "tools" not in sent[1]
+    assert sent[1]["previous_response_id"] == "r"
