@@ -300,13 +300,13 @@ class ElementView extends StatelessWidget {
           width: w,
           height: w * element.imageAspect,
           child: path == null
-              ? const ColoredBox(color: Palette.paperDeep)
+              ? ColoredBox(color: context.tokens.paperDeep)
               : Image.file(
                   File(path),
                   fit: BoxFit.contain,
                   gaplessPlayback: true,
                   errorBuilder: (_, _, _) =>
-                      const ColoredBox(color: Palette.paperDeep),
+                      ColoredBox(color: context.tokens.paperDeep),
                 ),
         );
       case ElementKind.text:

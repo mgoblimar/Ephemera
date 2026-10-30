@@ -48,6 +48,8 @@ class EphemeraTokens extends ThemeExtension<EphemeraTokens> {
     required this.cardRadius,
     required this.scrapTilt,
     required this.shadow,
+    required this.covers,
+    this.catDoodles = false,
   });
 
   final String id;
@@ -81,6 +83,12 @@ class EphemeraTokens extends ThemeExtension<EphemeraTokens> {
   final double scrapTilt;
   final List<BoxShadow> shadow;
 
+  /// Cloth colours for new journals, cycled (white text sits on them).
+  final List<int> covers;
+
+  /// Original cat-face and paw-print doodles on empty states, tape and labels.
+  final bool catDoodles;
+
   TextStyle display(double size, {Color? color}) =>
       _font(displayFont, size, color ?? ink, FontWeight.w600);
 
@@ -106,6 +114,8 @@ class EphemeraTokens extends ThemeExtension<EphemeraTokens> {
     cardRadius: cardRadius,
     scrapTilt: scrapTilt,
     shadow: shadow,
+    covers: covers,
+    catDoodles: catDoodles,
   );
 
   /// Themes switch instantly; there's nothing meaningful to interpolate.
@@ -134,10 +144,38 @@ const deskTokens = EphemeraTokens(
   shadow: [
     BoxShadow(color: Color(0x2E3D2B1F), blurRadius: 10, offset: Offset(0, 4)),
   ],
+  covers: [0xFFB5603F, 0xFF6F7F5A, 0xFF3D5A80, 0xFF8E5572, 0xFF2F2A26],
 );
 
-/// All themes the app offers; Cozy cat joins here (SPEC 4.8).
-const themes = {'desk': deskTokens};
+/// Cute and playful: strawberry-milk pastels, rounded type, bouncier tilts and
+/// our own cat doodles (SPEC 4.8). Mood only; no third-party characters or art.
+const cozyCatTokens = EphemeraTokens(
+  id: 'cozy',
+  name: 'Cozy cat',
+  paper: Color(0xFFFDF1EA),
+  paperDeep: Color(0xFFF5DCD4),
+  surface: Color(0xFFFFFAF7),
+  ink: Color(0xFF4A3B42),
+  inkSoft: Color(0xFF86707B),
+  accent: Color(0xFFC85A6E), // deep enough for white button text
+  accentSoft: Color(0xFFFADDE3),
+  secondary: Color(0xFF5E9C86),
+  tape: Color(0xCCB9D7EA),
+  displayFont: 'Fredoka',
+  bodyFont: 'Nunito',
+  handFont: 'Gaegu',
+  cardRadius: 22,
+  scrapTilt: 0.09,
+  shadow: [
+    BoxShadow(color: Color(0x33C85A6E), blurRadius: 14, offset: Offset(0, 5)),
+  ],
+  // Dusty rose, mint, lavender, peach, sky.
+  covers: [0xFFCB7383, 0xFF5F9F8A, 0xFF8A7DB5, 0xFFD98B66, 0xFF6694BF],
+  catDoodles: true,
+);
+
+/// All themes the app offers, by id.
+const themes = {'desk': deskTokens, 'cozy': cozyCatTokens};
 
 extension EphemeraThemeContext on BuildContext {
   EphemeraTokens get tokens =>

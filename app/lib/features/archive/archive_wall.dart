@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'package:ephemera_ai/features/doodles.dart';
 import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/theme.dart';
 
@@ -167,6 +168,9 @@ class ScrapCard extends StatelessWidget {
                     width: (shown.width + _matPadding * 2) * 0.38,
                     height: 16,
                     color: tokens.tape,
+                    child: tokens.catDoodles
+                        ? PawPrints(color: Colors.white.withValues(alpha: 0.8))
+                        : null,
                   ),
                 ),
               ),

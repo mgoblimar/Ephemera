@@ -54,7 +54,7 @@ class _ScrapPickerSheet extends ConsumerWidget {
                       onTap: () => Navigator.pop(context, items[i]),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Palette.paperDeep,
+                          color: context.tokens.paperDeep,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Padding(

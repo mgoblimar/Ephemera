@@ -3,18 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ephemera_ai/features/library/book_screen.dart';
 import 'package:ephemera_ai/features/library/journal_cover.dart';
+import 'package:ephemera_ai/features/library/theme_picker.dart';
 import 'package:ephemera_ai/models/journal.dart';
 import 'package:ephemera_ai/features/zero_width_guard.dart';
 import 'package:ephemera_ai/providers.dart';
+import 'package:ephemera_ai/theme.dart';
 import 'package:ephemera_ai/features/empty_state.dart';
-
-const coverColors = [
-  0xFFB5603F,
-  0xFF6F7F5A,
-  0xFF3D5A80,
-  0xFF8E5572,
-  0xFF2F2A26,
-];
 
 /// The shelf of journals.
 class LibraryScreen extends ConsumerWidget {
@@ -24,7 +18,10 @@ class LibraryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final journals = ref.watch(journalsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Journals')),
+      appBar: AppBar(
+        title: const Text('Journals'),
+        actions: const [ThemePickerButton()],
+      ),
       body: journals.when(
         data: (items) => items.isEmpty
             ? const _EmptyShelf()
@@ -69,12 +66,13 @@ class LibraryScreen extends ConsumerWidget {
       context: context,
       builder: (_) => const _TitleDialog(),
     );
-    if (title == null) return;
+    if (title == null || !context.mounted) return;
+    final covers = context.tokens.covers;
     final repository = await ref.read(journalRepositoryProvider.future);
     final count = (await repository.getAll()).length;
     final journal = await repository.create(
       title,
-      coverColor: coverColors[count % coverColors.length],
+      coverColor: covers[count % covers.length],
     );
     ref.invalidate(journalsProvider);
     if (context.mounted) _open(context, journal);

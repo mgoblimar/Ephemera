@@ -288,7 +288,7 @@ The features work, but the app still looks like stock Material. The demo video n
 | Theme | Feel | Hackathon scope |
 |---|---|---|
 | **Desk** (default) | Warm editorial scrapbook: kraft and cream paper, serif + handwriting, washi tape, terracotta and moss | Build fully (A list below) |
-| **Cozy cat** | Cute and playful, inspired by the mofusand mood: pastels, rounded shapes, original cat-ear and paw doodles, bouncy motion. **Original art only; no mofusand characters, artwork or name** (copyrighted brand). | Second theme if Day 5 allows; else post-hackathon |
+| **Cozy cat** | Cute and playful, inspired by the mofusand mood: pastels, rounded shapes, original cat-ear and paw doodles, bouncy motion. **Original art only; no mofusand characters, artwork or name** (copyrighted brand). | ✅ Built Oct 30: pastel tokens (Fredoka / Nunito / Gaegu), rounder cards, pastel covers, our own cat-face and paw-print doodles (empty states, tape, journal labels); picker on the Journals tab, saved on device |
 | **Studio** | Clean modern: white, bold type, scraps as the only colour | Post-hackathon |
 | **Vintage** | Moody kraft and ink, aged paper, stamps, typewriter type | Post-hackathon |
 

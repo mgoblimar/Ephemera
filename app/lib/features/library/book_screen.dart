@@ -64,15 +64,13 @@ class _BookScreenState extends ConsumerState<BookScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final pageCount = journal.pages.length;
+    final paper = context.tokens.paper;
     return Scaffold(
       backgroundColor: Color(journal.coverColor),
       appBar: AppBar(
-        title: Text(
-          journal.title,
-          style: const TextStyle(color: Palette.paper),
-        ),
+        title: Text(journal.title, style: TextStyle(color: paper)),
         backgroundColor: Color(journal.coverColor),
-        foregroundColor: Palette.paper,
+        foregroundColor: paper,
         actions: [
           TextButton.icon(
             onPressed: () => Navigator.push(
@@ -81,7 +79,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                 builder: (_) => ThemeBlendScreen(journal: journal),
               ),
             ),
-            style: TextButton.styleFrom(foregroundColor: Palette.paper),
+            style: TextButton.styleFrom(foregroundColor: paper),
             icon: const Icon(Icons.auto_awesome),
             label: const Text('Theme Blend'),
           ),
@@ -113,7 +111,7 @@ class _BookScreenState extends ConsumerState<BookScreen> {
                 _index < pageCount
                     ? 'Page ${_index + 1} of $pageCount · tap to edit'
                     : 'Add a page',
-                style: const TextStyle(color: Palette.paper),
+                style: TextStyle(color: paper),
               ),
             ),
           ],
@@ -186,19 +184,20 @@ class _AddPageLeaf extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return AspectRatio(
       aspectRatio: 1 / pageAspect,
       child: Material(
-        color: Palette.paper,
+        color: tokens.paper,
         child: InkWell(
           onTap: onTap,
-          child: const Center(
+          child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.note_add_outlined, size: 40, color: Palette.inkSoft),
-                SizedBox(height: 8),
-                Text('Add a page', style: TextStyle(color: Palette.inkSoft)),
+                Icon(Icons.note_add_outlined, size: 40, color: tokens.inkSoft),
+                const SizedBox(height: 8),
+                Text('Add a page', style: TextStyle(color: tokens.inkSoft)),
               ],
             ),
           ),

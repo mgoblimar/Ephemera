@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:ephemera_ai/features/doodles.dart';
 import 'package:ephemera_ai/features/editor/editor_sheets.dart';
 import 'package:ephemera_ai/features/editor/page_canvas.dart';
 import 'package:ephemera_ai/features/editor/page_history.dart';
@@ -404,9 +405,23 @@ class _WashiStrip extends StatelessWidget {
           clipper: _TornEnds(),
           child: CustomPaint(
             painter: _TapeStripes(tokens.tape),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-              child: child,
+            child: Stack(
+              children: [
+                if (tokens.catDoodles)
+                  Positioned.fill(
+                    child: PawPrints(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      pawSize: 14,
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 4,
+                  ),
+                  child: child,
+                ),
+              ],
             ),
           ),
         ),

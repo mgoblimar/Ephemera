@@ -78,7 +78,10 @@ class PhotoSection extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _status(pieces.where((p) => !p.isElement).length),
+                child: _status(
+                  context,
+                  pieces.where((p) => !p.isElement).length,
+                ),
               ),
               if (pieces.isNotEmpty)
                 TextButton(
@@ -145,7 +148,8 @@ class PhotoSection extends StatelessWidget {
       ? null
       : () => onSplit(piece);
 
-  Widget _status(int count) {
+  Widget _status(BuildContext context, int count) {
+    final tokens = context.tokens;
     if (photo.isLoading) {
       return const Row(
         children: [
@@ -163,10 +167,7 @@ class PhotoSection extends StatelessWidget {
       return Row(
         children: [
           Flexible(
-            child: Text(
-              error,
-              style: const TextStyle(color: Palette.terracotta),
-            ),
+            child: Text(error, style: TextStyle(color: tokens.accent)),
           ),
           TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
@@ -204,13 +205,14 @@ class PieceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return Container(
       width: _thumbSize,
       decoration: BoxDecoration(
-        color: piece.isElement ? Palette.paper : Palette.paperDeep,
+        color: piece.isElement ? tokens.paper : tokens.paperDeep,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: chosen ? Palette.terracotta : Palette.paperDeep,
+          color: chosen ? tokens.accent : tokens.paperDeep,
           width: 2,
         ),
       ),
@@ -228,7 +230,7 @@ class PieceTile extends StatelessWidget {
                 opacity: chosen ? 1 : 0.45,
                 child: Column(
                   children: [
-                    _thumbWithCheck(),
+                    _thumbWithCheck(tokens),
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Text(
@@ -243,26 +245,26 @@ class PieceTile extends StatelessWidget {
             ),
           ),
           if (splitting)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 4),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
               child: Text(
                 'Splitting…',
-                style: TextStyle(fontSize: 12, color: Palette.inkSoft),
+                style: TextStyle(fontSize: 12, color: tokens.inkSoft),
               ),
             )
           else if (onSplit != null)
             InkWell(
               onTap: onSplit,
-              child: const Padding(
-                padding: EdgeInsets.only(bottom: 4),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.content_cut, size: 14, color: Palette.inkSoft),
-                    SizedBox(width: 4),
+                    Icon(Icons.content_cut, size: 14, color: tokens.inkSoft),
+                    const SizedBox(width: 4),
                     Text(
                       'Split',
-                      style: TextStyle(fontSize: 12, color: Palette.inkSoft),
+                      style: TextStyle(fontSize: 12, color: tokens.inkSoft),
                     ),
                   ],
                 ),
@@ -273,7 +275,7 @@ class PieceTile extends StatelessWidget {
     );
   }
 
-  Widget _thumbWithCheck() {
+  Widget _thumbWithCheck(EphemeraTokens tokens) {
     final thumb = ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
       child: Image.memory(
@@ -306,7 +308,7 @@ class PieceTile extends StatelessWidget {
           child: Icon(
             chosen ? Icons.check_circle : Icons.circle_outlined,
             size: 20,
-            color: chosen ? Palette.terracotta : Colors.white,
+            color: chosen ? tokens.accent : Colors.white,
           ),
         ),
       ],
@@ -325,7 +327,7 @@ class _GhostTile extends StatelessWidget {
         width: _thumbSize,
         height: _thumbSize + 18,
         decoration: BoxDecoration(
-          color: Palette.paperDeep,
+          color: context.tokens.paperDeep,
           borderRadius: BorderRadius.circular(6),
         ),
       ),
@@ -360,7 +362,7 @@ class CutBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final requests = (chosenCount / piecesPerSamRequest).ceil();
     return Material(
-      color: Palette.paperDeep,
+      color: context.tokens.paperDeep,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
         child: Column(
@@ -377,7 +379,7 @@ class CutBar extends StatelessWidget {
                   ? 'Tap pieces to choose what to keep'
                   : '$chosenCount chosen · $requests cut request${requests == 1 ? '' : 's'} · '
                         '≈₱${(requests * samRequestCostPesos).toStringAsFixed(2)}',
-              style: const TextStyle(color: Palette.inkSoft),
+              style: TextStyle(color: context.tokens.inkSoft),
             ),
             const SizedBox(height: 8),
             Padding(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:ephemera_ai/features/doodles.dart';
 import 'package:ephemera_ai/theme.dart';
 
 /// An icon, a display-font title and a short hint, centred.
@@ -24,7 +25,10 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: tokens.accent),
+            if (tokens.catDoodles)
+              CatFace(size: 72, color: tokens.accent)
+            else
+              Icon(icon, size: 56, color: tokens.accent),
             const SizedBox(height: 12),
             Text(title, style: tokens.display(22), textAlign: TextAlign.center),
             const SizedBox(height: 8),

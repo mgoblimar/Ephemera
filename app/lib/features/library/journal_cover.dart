@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'package:ephemera_ai/features/doodles.dart';
 import 'package:ephemera_ai/models/journal.dart';
 import 'package:ephemera_ai/theme.dart';
 
@@ -126,6 +127,12 @@ class _Label extends StatelessWidget {
             child: Container(width: 40, height: 13, color: tokens.tape),
           ),
         ),
+        if (tokens.catDoodles)
+          Positioned(
+            top: -17,
+            right: 8,
+            child: CatFace(size: 24, color: tokens.paper),
+          ),
       ],
     );
   }
