@@ -10,6 +10,7 @@ import 'package:ephemera_ai/features/zero_width_guard.dart';
 import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/providers.dart';
 import 'package:ephemera_ai/theme.dart';
+import 'package:ephemera_ai/features/empty_state.dart';
 
 class ArchiveScreen extends ConsumerStatefulWidget {
   const ArchiveScreen({super.key});
@@ -122,28 +123,11 @@ class _EmptyArchive extends StatelessWidget {
   const _EmptyArchive();
 
   @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.local_activity_outlined, size: 56, color: tokens.accent),
-            const SizedBox(height: 12),
-            Text('Your archive is empty', style: tokens.display(22)),
-            const SizedBox(height: 8),
-            Text(
-              'Snap your tickets, receipts, tape and pressed flowers to begin.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: tokens.inkSoft, height: 1.5),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const EmptyState(
+    icon: Icons.local_activity_outlined,
+    title: 'Your archive is empty',
+    hint: 'Snap your tickets, receipts, tape and pressed flowers to begin.',
+  );
 }
 
 class _NoMatches extends StatelessWidget {

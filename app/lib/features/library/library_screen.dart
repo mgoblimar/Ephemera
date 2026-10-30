@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ephemera_ai/features/library/book_screen.dart';
+import 'package:ephemera_ai/features/library/journal_cover.dart';
 import 'package:ephemera_ai/models/journal.dart';
 import 'package:ephemera_ai/features/zero_width_guard.dart';
 import 'package:ephemera_ai/providers.dart';
-import 'package:ephemera_ai/theme.dart';
+import 'package:ephemera_ai/features/empty_state.dart';
 
 const coverColors = [
   0xFFB5603F,
@@ -80,82 +81,15 @@ class LibraryScreen extends ConsumerWidget {
   }
 }
 
-class JournalCover extends StatelessWidget {
-  const JournalCover({super.key, required this.journal, required this.onTap});
-
-  final Journal journal;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final pages = journal.pages.length;
-    return Material(
-      color: Color(journal.coverColor),
-      borderRadius: const BorderRadius.horizontal(
-        left: Radius.circular(4),
-        right: Radius.circular(10),
-      ),
-      elevation: 3,
-      child: InkWell(
-        onTap: onTap,
-        child: Stack(
-          children: [
-            // Spine
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: 12,
-              child: ColoredBox(color: Colors.black.withValues(alpha: 0.18)),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    journal.title,
-                    style: const TextStyle(
-                      color: Palette.paper,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const Spacer(),
-                  Text(
-                    '$pages page${pages == 1 ? '' : 's'}',
-                    style: TextStyle(
-                      color: Palette.paper.withValues(alpha: 0.8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _EmptyShelf extends StatelessWidget {
   const _EmptyShelf();
 
   @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text(
-          'No journals yet.\nStart one, then fill its pages with your scraps.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Palette.inkSoft, height: 1.5),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const EmptyState(
+    icon: Icons.menu_book_outlined,
+    title: 'No journals yet',
+    hint: 'Start one, then fill its pages with your scraps.',
+  );
 }
 
 class _TitleDialog extends StatefulWidget {

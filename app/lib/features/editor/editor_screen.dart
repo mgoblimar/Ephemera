@@ -213,10 +213,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Palette.paperDeep,
+      backgroundColor: context.tokens.paperDeep,
       appBar: AppBar(
         title: Text(_journal.title),
-        backgroundColor: Palette.paperDeep,
+        backgroundColor: context.tokens.paperDeep,
         actions: [
           IconButton(
             tooltip: 'Undo',
@@ -304,8 +304,7 @@ class _ToolBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+    return _WashiStrip(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -341,8 +340,7 @@ class _SelectionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+    return _WashiStrip(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -375,15 +373,96 @@ class _Tool extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Palette.ink),
+            Icon(icon, color: context.tokens.ink),
             const SizedBox(height: 2),
             Text(
               label,
-              style: const TextStyle(fontSize: 12, color: Palette.ink),
+              style: TextStyle(fontSize: 12, color: context.tokens.ink),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+/// A strip of washi tape across the bottom: translucent, faintly striped, with
+/// torn zig-zag ends.
+class _WashiStrip extends StatelessWidget {
+  const _WashiStrip({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 0, 6, 12),
+      child: Transform.rotate(
+        angle: -0.008,
+        child: ClipPath(
+          clipper: _TornEnds(),
+          child: CustomPaint(
+            painter: _TapeStripes(tokens.tape),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TornEnds extends CustomClipper<Path> {
+  static const _tooth = 6.0;
+
+  @override
+  Path getClip(Size size) {
+    final path = Path()..moveTo(_tooth, 0);
+    path.lineTo(size.width - _tooth, 0);
+    var y = 0.0;
+    var out = true;
+    while (y < size.height) {
+      y = (y + _tooth).clamp(0, size.height);
+      path.lineTo(out ? size.width : size.width - _tooth, y);
+      out = !out;
+    }
+    path.lineTo(_tooth, size.height);
+    out = true;
+    while (y > 0) {
+      y = (y - _tooth).clamp(0, size.height);
+      path.lineTo(out ? 0 : _tooth, y);
+      out = !out;
+    }
+    return path..close();
+  }
+
+  @override
+  bool shouldReclip(_TornEnds old) => false;
+}
+
+class _TapeStripes extends CustomPainter {
+  _TapeStripes(this.tape);
+
+  final Color tape;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = tape);
+    final stripe = Paint()
+      ..color = Colors.white.withValues(alpha: 0.18)
+      ..strokeWidth = 5;
+    for (var x = -size.height; x < size.width; x += 16) {
+      canvas.drawLine(
+        Offset(x, size.height),
+        Offset(x + size.height, 0),
+        stripe,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TapeStripes old) => old.tape != tape;
 }

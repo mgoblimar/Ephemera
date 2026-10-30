@@ -5,6 +5,7 @@ import 'package:ephemera_ai/features/capture/cut_style_picker.dart';
 import 'package:ephemera_ai/models/scan.dart';
 import 'package:ephemera_ai/models/segmentation.dart';
 import 'package:ephemera_ai/theme.dart';
+import 'package:ephemera_ai/features/empty_state.dart';
 
 const _thumbSize = 96.0;
 
@@ -12,19 +13,13 @@ class EmptySession extends StatelessWidget {
   const EmptySession({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text(
-          'Add photos of your scraps. We find the pieces first - '
-          'cutting happens once, after you choose what to keep.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Palette.inkSoft, height: 1.5),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const EmptyState(
+    icon: Icons.add_a_photo_outlined,
+    title: 'Scan a few scraps',
+    hint:
+        'Add photos of your scraps. We find the pieces first - '
+        'cutting happens once, after you choose what to keep.',
+  );
 }
 
 /// One scanned photo: a header and a tile per detected piece.

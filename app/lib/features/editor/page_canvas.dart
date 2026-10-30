@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:ephemera_ai/features/editor/handwriting.dart';
 import 'package:ephemera_ai/models/journal.dart';
@@ -10,6 +12,9 @@ import 'package:ephemera_ai/theme.dart';
 /// Smallest/largest element size, as a fraction of page width.
 const _minSize = 0.03;
 const _maxSize = 1.6;
+
+/// Room around a selected element for its corner handle (logical px).
+const _handleInset = 13.0;
 
 /// Called while an element is being dragged/pinched ([done] false) and once
 /// when the gesture ends ([done] true) - only the latter becomes an undo step.
@@ -91,6 +96,7 @@ class _PlacedElement extends StatefulWidget {
 }
 
 class _PlacedElementState extends State<_PlacedElement> {
+  final _boxKey = GlobalKey();
   PageElement? _base;
 
   /// Latest gesture result; the widget may not have rebuilt with it yet when
@@ -98,33 +104,73 @@ class _PlacedElementState extends State<_PlacedElement> {
   PageElement? _latest;
   Offset _startFocal = Offset.zero;
 
-  void _start(ScaleStartDetails details) {
+  /// Element centre on screen and the pointer's offset from it when a corner
+  /// handle drag started.
+  Offset _center = Offset.zero;
+  Offset _startArm = Offset.zero;
+
+  void _begin() {
+    if (!widget.selected) HapticFeedback.selectionClick();
     widget.onSelect?.call(widget.element.id);
     _base = widget.element;
     _latest = widget.element;
+  }
+
+  void _emit(PageElement updated) {
+    _latest = updated;
+    widget.onChanged?.call(updated, done: false);
+  }
+
+  void _start(ScaleStartDetails details) {
+    _begin();
     _startFocal = details.focalPoint;
   }
 
   void _update(ScaleUpdateDetails details) {
     final base = _base;
-    final onChanged = widget.onChanged;
-    if (base == null || onChanged == null) return;
+    if (base == null) return;
     final delta = details.focalPoint - _startFocal;
-    final updated = base.copyWith(
-      cx: (base.cx + delta.dx / widget.pageSize.width).clamp(0.0, 1.0),
-      cy: (base.cy + delta.dy / widget.pageSize.height).clamp(0.0, 1.0),
-      size: (base.size * details.scale).clamp(_minSize, _maxSize),
-      rotation: base.rotation + details.rotation,
+    _emit(
+      base.copyWith(
+        cx: (base.cx + delta.dx / widget.pageSize.width).clamp(0.0, 1.0),
+        cy: (base.cy + delta.dy / widget.pageSize.height).clamp(0.0, 1.0),
+        size: (base.size * details.scale).clamp(_minSize, _maxSize),
+        rotation: base.rotation + details.rotation,
+      ),
     );
-    _latest = updated;
-    onChanged(updated, done: false);
   }
 
-  void _end(ScaleEndDetails details) {
+  void _handleStart(DragStartDetails details) {
+    final box = _boxKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    _begin();
+    _center = box.localToGlobal(box.size.center(Offset.zero));
+    _startArm = details.globalPosition - _center;
+  }
+
+  /// Corner handle: distance from the centre scales, angle around it rotates.
+  void _handleUpdate(DragUpdateDetails details) {
+    final base = _base;
+    if (base == null || _startArm.distance == 0) return;
+    final arm = details.globalPosition - _center;
+    _emit(
+      base.copyWith(
+        size: (base.size * arm.distance / _startArm.distance).clamp(
+          _minSize,
+          _maxSize,
+        ),
+        rotation: base.rotation + arm.direction - _startArm.direction,
+      ),
+    );
+  }
+
+  void _end([Object? _]) {
     final latest = _latest;
     _base = null;
     _latest = null;
-    if (latest != null) widget.onChanged?.call(latest, done: true);
+    if (latest == null) return;
+    HapticFeedback.lightImpact();
+    widget.onChanged?.call(latest, done: true);
   }
 
   @override
@@ -132,18 +178,13 @@ class _PlacedElementState extends State<_PlacedElement> {
     final element = widget.element;
     final width = widget.pageSize.width;
     Widget child = ElementView(element: element, pageWidth: width);
-    if (widget.selected) {
-      child = DecoratedBox(
-        position: DecorationPosition.foreground,
-        decoration: BoxDecoration(
-          border: Border.all(color: Palette.terracotta, width: 2),
-        ),
-        child: child,
-      );
-    }
+    if (widget.selected) child = _selectionChrome(context, child);
     if (widget.onChanged != null) {
       child = GestureDetector(
-        onTap: () => widget.onSelect?.call(element.id),
+        onTap: () {
+          if (!widget.selected) HapticFeedback.selectionClick();
+          widget.onSelect?.call(element.id);
+        },
         onScaleStart: _start,
         onScaleUpdate: _update,
         onScaleEnd: _end,
@@ -155,8 +196,85 @@ class _PlacedElementState extends State<_PlacedElement> {
       top: element.cy * widget.pageSize.height,
       child: FractionalTranslation(
         translation: const Offset(-0.5, -0.5),
-        child: Transform.rotate(angle: element.rotation, child: child),
+        child: Transform.rotate(
+          angle: element.rotation,
+          child: KeyedSubtree(key: _boxKey, child: child),
+        ),
       ),
+    );
+  }
+
+  /// Accent outline, corner marks and a scale/rotate handle. The padding keeps
+  /// the handle inside the hit-test area and is symmetric, so the centre stays.
+  Widget _selectionChrome(BuildContext context, Widget child) {
+    final tokens = context.tokens;
+    Widget mark(Alignment at) => Align(
+      alignment: at,
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          color: tokens.surface,
+          border: Border.all(color: tokens.accent, width: 2),
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(_handleInset),
+          child: DecoratedBox(
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              border: Border.all(color: tokens.accent, width: 1.5),
+            ),
+            child: child,
+          ),
+        ),
+        Positioned.fill(
+          child: Padding(
+            padding: const EdgeInsets.all(_handleInset - 5),
+            child: IgnorePointer(
+              child: Stack(
+                children: [
+                  mark(Alignment.topLeft),
+                  mark(Alignment.topRight),
+                  mark(Alignment.bottomLeft),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          right: 0,
+          bottom: 0,
+          child: GestureDetector(
+            key: const ValueKey('resize-handle'),
+            dragStartBehavior: DragStartBehavior.down,
+            onPanStart: _handleStart,
+            onPanUpdate: _handleUpdate,
+            onPanEnd: _end,
+            child: Semantics(
+              label: 'Resize and rotate',
+              child: Container(
+                width: _handleInset * 2,
+                height: _handleInset * 2,
+                decoration: BoxDecoration(
+                  color: tokens.accent,
+                  shape: BoxShape.circle,
+                  boxShadow: tokens.shadow,
+                ),
+                child: Icon(
+                  Icons.open_in_full,
+                  size: 13,
+                  color: tokens.surface,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

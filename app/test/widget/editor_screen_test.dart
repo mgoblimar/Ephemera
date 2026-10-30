@@ -86,6 +86,29 @@ void main() {
     expect(tester.getCenter(find.text('drag me')).dy, closeTo(before.dy, 2));
   });
 
+  testWidgets('the corner handle scales the selected element', (tester) async {
+    await pumpEditor(tester);
+    await addCaption(tester, 'grow me');
+    final before = tester.getSize(find.text('grow me'));
+    final handle = find.byKey(const ValueKey('resize-handle'));
+    final center = tester.getCenter(find.text('grow me'));
+    final arm = tester.getCenter(handle) - center;
+
+    // Drag straight outwards: no rotation, about twice the distance.
+    final gesture = await tester.startGesture(tester.getCenter(handle));
+    for (var i = 0; i < 10; i++) {
+      await gesture.moveBy(arm / 10);
+      await tester.pump();
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSize(find.text('grow me')).width,
+      greaterThan(before.width * 1.5),
+    );
+  });
+
   testWidgets('delete removes the selected element; undo restores it', (
     tester,
   ) async {
