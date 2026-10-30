@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ephemera_ai/features/scan/scan_session_screen.dart';
 import 'package:ephemera_ai/models/scrap.dart';
+import 'package:ephemera_ai/features/zero_width_guard.dart';
 import 'package:ephemera_ai/providers.dart';
 import 'package:ephemera_ai/theme.dart';
 
@@ -28,6 +29,8 @@ class ArchiveScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        // Both tabs stay alive in the IndexedStack, so their buttons need distinct hero tags.
+        heroTag: 'scan-fab',
         onPressed: () => _startScan(context),
         icon: const Icon(Icons.photo_camera_outlined),
         label: const Text('Scan'),
@@ -77,22 +80,24 @@ class _ScrapGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-      ),
-      itemCount: scraps.length,
-      itemBuilder: (context, index) => DecoratedBox(
-        decoration: BoxDecoration(
-          color: Palette.paperDeep,
-          borderRadius: BorderRadius.circular(6),
+    return ZeroWidthGuard(
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Image.file(File(scraps[index].pngPath), fit: BoxFit.contain),
+        itemCount: scraps.length,
+        itemBuilder: (context, index) => DecoratedBox(
+          decoration: BoxDecoration(
+            color: Palette.paperDeep,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Image.file(File(scraps[index].pngPath), fit: BoxFit.contain),
+          ),
         ),
       ),
     );

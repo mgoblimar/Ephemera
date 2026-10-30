@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:ephemera_ai/features/archive/archive_screen.dart';
+import 'package:ephemera_ai/features/home_shell.dart';
 import 'package:ephemera_ai/theme.dart';
 
 void main() {
@@ -16,7 +16,7 @@ class EphemeraApp extends StatelessWidget {
     return MaterialApp(
       title: 'EphemeraAI',
       theme: buildTheme(),
-      home: const ArchiveScreen(),
+      home: const HomeShell(),
     );
   }
 }

@@ -1,0 +1,389 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:uuid/uuid.dart';
+
+import 'package:ephemera_ai/features/editor/editor_sheets.dart';
+import 'package:ephemera_ai/features/editor/page_canvas.dart';
+import 'package:ephemera_ai/features/editor/page_history.dart';
+import 'package:ephemera_ai/models/journal.dart';
+import 'package:ephemera_ai/models/scrap.dart';
+import 'package:ephemera_ai/providers.dart';
+import 'package:ephemera_ai/theme.dart';
+
+const _newScrapSize = 0.42; // fraction of page width
+const _newTextSize = 0.07;
+const _maxTilt = 0.12; // radians; a slight hand-placed tilt
+const _duplicateOffset = 0.04;
+const _exportPixelRatio = 3.0;
+
+/// Edits one page of a journal. Every finished change is one undo step and
+/// is saved straight away.
+class EditorScreen extends ConsumerStatefulWidget {
+  const EditorScreen({super.key, required this.journal, required this.pageId});
+
+  final Journal journal;
+  final String pageId;
+
+  @override
+  ConsumerState<EditorScreen> createState() => _EditorScreenState();
+}
+
+class _EditorScreenState extends ConsumerState<EditorScreen> {
+  late Journal _journal = widget.journal;
+  late PageHistory _history = PageHistory.start(
+    widget.journal.pages.firstWhere((p) => p.id == widget.pageId),
+  );
+
+  /// What's on screen; ahead of `_history.current` only mid-gesture.
+  late JournalPage _live = _history.current;
+  String? _selectedId;
+  final _boundaryKey = GlobalKey();
+  final _random = math.Random();
+  static const _uuid = Uuid();
+
+  PageElement? get _selected =>
+      _selectedId == null ? null : _live.element(_selectedId!);
+
+  void _commit(JournalPage page) {
+    setState(() {
+      _live = page;
+      _history = _history.push(page);
+    });
+    _save();
+  }
+
+  void _restore(PageHistory history) {
+    setState(() {
+      _history = history;
+      _live = history.current;
+      if (_selectedId != null && _live.element(_selectedId!) == null) {
+        _selectedId = null;
+      }
+    });
+    _save();
+  }
+
+  void _save() {
+    _journal = _journal.replacingPage(_history.current);
+    final journal = _journal;
+    unawaited(() async {
+      try {
+        final repository = await ref.read(journalRepositoryProvider.future);
+        await repository.save(journal);
+        ref.invalidate(journalsProvider);
+      } on FileSystemException {
+        _showMessage("Couldn't save the page. Check free storage.");
+      }
+    }());
+  }
+
+  void _onElementChanged(PageElement element, {required bool done}) {
+    final page = _live.replacing(element);
+    if (done) {
+      _commit(page);
+    } else {
+      setState(() => _live = page);
+    }
+  }
+
+  double _tilt() => (_random.nextDouble() * 2 - 1) * _maxTilt;
+
+  Future<void> _addScrap() async {
+    final Scrap? scrap = await pickScrap(context);
+    if (scrap == null || !mounted) return;
+    final element = PageElement(
+      id: _uuid.v4(),
+      kind: ElementKind.scrap,
+      cx: 0.5,
+      cy: 0.45,
+      size: _newScrapSize,
+      rotation: _tilt(),
+      scrapId: scrap.id,
+      imagePath: scrap.pngPath,
+      imageAspect: scrap.height / scrap.width,
+    );
+    _commit(_live.adding(element));
+    setState(() => _selectedId = element.id);
+  }
+
+  Future<void> _addText() async {
+    final choice = await editText(context);
+    if (choice == null || !mounted) return;
+    final element = PageElement(
+      id: _uuid.v4(),
+      kind: ElementKind.text,
+      cx: 0.5,
+      cy: 0.8,
+      size: _newTextSize,
+      rotation: _tilt() / 2,
+      text: choice.text,
+      font: choice.font,
+    );
+    _commit(_live.adding(element));
+    setState(() => _selectedId = element.id);
+  }
+
+  Future<void> _editSelectedText() async {
+    final element = _selected;
+    if (element == null || element.kind != ElementKind.text) return;
+    final choice = await editText(
+      context,
+      initialText: element.text,
+      initialFont: element.font,
+    );
+    if (choice == null || !mounted) return;
+    _commit(
+      _live.replacing(element.copyWith(text: choice.text, font: choice.font)),
+    );
+  }
+
+  void _duplicateSelected() {
+    final element = _selected;
+    if (element == null) return;
+    final copy = PageElement.fromJson({
+      ...element.toJson(),
+      'id': _uuid.v4(),
+      'cx': (element.cx + _duplicateOffset).clamp(0.0, 1.0),
+      'cy': (element.cy + _duplicateOffset).clamp(0.0, 1.0),
+    });
+    _commit(_live.adding(copy));
+    setState(() => _selectedId = copy.id);
+  }
+
+  void _deleteSelected() {
+    final id = _selectedId;
+    if (id == null) return;
+    setState(() => _selectedId = null);
+    _commit(_live.removing(id));
+  }
+
+  void _reorderSelected(int delta) {
+    final id = _selectedId;
+    if (id != null) _commit(_live.reordering(id, delta));
+  }
+
+  void _cyclePaper() {
+    const styles = PaperStyle.values;
+    _commit(_live.withPaper(styles[(_live.paper.index + 1) % styles.length]));
+  }
+
+  Future<void> _export() async {
+    setState(() => _selectedId = null);
+    await WidgetsBinding.instance.endOfFrame; // render without selection chrome
+    final boundary =
+        _boundaryKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
+    if (boundary == null) return;
+    try {
+      final image = await boundary.toImage(pixelRatio: _exportPixelRatio);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) return;
+      final dir = await getTemporaryDirectory();
+      final file = File(
+        p.join(
+          dir.path,
+          'ephemera_page_${DateTime.now().millisecondsSinceEpoch}.png',
+        ),
+      );
+      await file.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path)], text: _journal.title),
+      );
+    } on FileSystemException {
+      _showMessage("Couldn't export the page.");
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Palette.paperDeep,
+      appBar: AppBar(
+        title: Text(_journal.title),
+        backgroundColor: Palette.paperDeep,
+        actions: [
+          IconButton(
+            tooltip: 'Undo',
+            onPressed: _history.canUndo
+                ? () => _restore(_history.undo())
+                : null,
+            icon: const Icon(Icons.undo),
+          ),
+          IconButton(
+            tooltip: 'Redo',
+            onPressed: _history.canRedo
+                ? () => _restore(_history.redo())
+                : null,
+            icon: const Icon(Icons.redo),
+          ),
+          IconButton(
+            tooltip: 'Export PNG',
+            onPressed: _export,
+            icon: const Icon(Icons.ios_share),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0x33000000),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: RepaintBoundary(
+                      key: _boundaryKey,
+                      child: JournalPageCanvas(
+                        page: _live,
+                        selectedId: _selectedId,
+                        onSelect: (id) => setState(() => _selectedId = id),
+                        onChanged: _onElementChanged,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (_selected != null)
+              _SelectionBar(
+                isText: _selected!.kind == ElementKind.text,
+                onForward: () => _reorderSelected(1),
+                onBackward: () => _reorderSelected(-1),
+                onDuplicate: _duplicateSelected,
+                onDelete: _deleteSelected,
+                onEditText: _editSelectedText,
+              )
+            else
+              _ToolBar(
+                onScrap: _addScrap,
+                onText: _addText,
+                onPaper: _cyclePaper,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolBar extends StatelessWidget {
+  const _ToolBar({
+    required this.onScrap,
+    required this.onText,
+    required this.onPaper,
+  });
+
+  final VoidCallback onScrap;
+  final VoidCallback onText;
+  final VoidCallback onPaper;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _Tool(
+            icon: Icons.add_photo_alternate_outlined,
+            label: 'Scrap',
+            onTap: onScrap,
+          ),
+          _Tool(icon: Icons.edit_outlined, label: 'Text', onTap: onText),
+          _Tool(icon: Icons.texture, label: 'Paper', onTap: onPaper),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({
+    required this.isText,
+    required this.onForward,
+    required this.onBackward,
+    required this.onDuplicate,
+    required this.onDelete,
+    required this.onEditText,
+  });
+
+  final bool isText;
+  final VoidCallback onForward;
+  final VoidCallback onBackward;
+  final VoidCallback onDuplicate;
+  final VoidCallback onDelete;
+  final VoidCallback onEditText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          if (isText)
+            _Tool(icon: Icons.edit_outlined, label: 'Edit', onTap: onEditText),
+          _Tool(icon: Icons.flip_to_front, label: 'Forward', onTap: onForward),
+          _Tool(icon: Icons.flip_to_back, label: 'Back', onTap: onBackward),
+          _Tool(icon: Icons.copy_outlined, label: 'Copy', onTap: onDuplicate),
+          _Tool(icon: Icons.delete_outline, label: 'Delete', onTap: onDelete),
+        ],
+      ),
+    );
+  }
+}
+
+class _Tool extends StatelessWidget {
+  const _Tool({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Palette.ink),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Palette.ink),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
