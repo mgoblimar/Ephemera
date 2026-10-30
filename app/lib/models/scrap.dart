@@ -7,7 +7,25 @@ const minAgentSide = 48;
 const minAgentElementArea = 120 * 120;
 const maxAgentElementStretch = 4.0;
 
-enum ScrapSource { capture, imported, generated }
+enum ScrapSource {
+  capture('Scanned'),
+  imported('Imported'),
+  generated('Made by AI');
+
+  const ScrapSource(this.label);
+  final String label;
+}
+
+/// Where the physical scrap is (SPEC 4.2): glued into a real spread, set aside
+/// for one, or still free. Theme Blend only uses scraps that are still free.
+enum PhysicalStatus {
+  available('Not used yet'),
+  used('Used in a spread'),
+  reserved('Set aside');
+
+  const PhysicalStatus(this.label);
+  final String label;
+}
 
 /// One cut-out piece of ephemera in the archive. Immutable; use [copyWith].
 class Scrap {
@@ -29,6 +47,7 @@ class Scrap {
     this.entities = const {},
     this.splitFromLabel,
     this.parentScrapId,
+    this.physicalStatus = PhysicalStatus.available,
   });
 
   final String id;
@@ -54,6 +73,7 @@ class Scrap {
 
   /// The parent's scrap id, when the parent was cut and saved too.
   final String? parentScrapId;
+  final PhysicalStatus physicalStatus;
 
   bool get isSplitElement => splitFromLabel != null;
 
@@ -77,6 +97,7 @@ class Scrap {
     String? description,
     bool? enriched,
     Map<String, String>? entities,
+    PhysicalStatus? physicalStatus,
   }) {
     return Scrap(
       id: id,
@@ -96,6 +117,7 @@ class Scrap {
       entities: entities ?? this.entities,
       splitFromLabel: splitFromLabel,
       parentScrapId: parentScrapId,
+      physicalStatus: physicalStatus ?? this.physicalStatus,
     );
   }
 
@@ -117,6 +139,7 @@ class Scrap {
     'entities': entities,
     'split_from_label': splitFromLabel,
     'parent_scrap_id': parentScrapId,
+    'physical_status': physicalStatus.name,
   };
 
   factory Scrap.fromJson(Map<String, dynamic> json) {
@@ -142,6 +165,9 @@ class Scrap {
       ),
       splitFromLabel: json['split_from_label'] as String?,
       parentScrapId: json['parent_scrap_id'] as String?,
+      physicalStatus:
+          PhysicalStatus.values.asNameMap()[json['physical_status']] ??
+          PhysicalStatus.available,
     );
   }
 }

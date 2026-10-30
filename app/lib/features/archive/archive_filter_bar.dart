@@ -87,6 +87,21 @@ class ArchiveFilterBar extends StatelessWidget {
                   facets.splitFrom,
                   (s) => filter.copyWith(splitFrom: s),
                 ),
+              _facetChip(
+                context,
+                'Status',
+                filter.statuses,
+                facets.statuses,
+                (s) => filter.copyWith(statuses: s),
+              ),
+              if (facets.sources.length > 1)
+                _facetChip(
+                  context,
+                  'Made by',
+                  filter.sources,
+                  facets.sources,
+                  (s) => filter.copyWith(sources: s),
+                ),
               _addedChip(context),
               if (facets.colors.isNotEmpty) _colorChip(context),
             ],
@@ -323,6 +338,81 @@ class _MultiPickSheetState extends State<_MultiPickSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Every active filter value as a chip; tapping its cross removes just that
+/// one. (The search box clears itself.)
+class ActiveFilterChips extends StatelessWidget {
+  const ActiveFilterChips({
+    super.key,
+    required this.filter,
+    required this.onChanged,
+  });
+
+  static const _addedLabels = {
+    AddedWithin.today: 'Added today',
+    AddedWithin.week: 'Added this week',
+    AddedWithin.month: 'Added this month',
+  };
+
+  final ScrapFilter filter;
+  final ValueChanged<ScrapFilter> onChanged;
+
+  List<(String, ScrapFilter, Color?)> _chips() {
+    final f = filter;
+    return [
+      for (final v in f.types)
+        (v, f.copyWith(types: ScrapFilter.toggled(f.types, v)), null),
+      for (final v in f.moods)
+        (v, f.copyWith(moods: ScrapFilter.toggled(f.moods, v)), null),
+      for (final v in f.tags)
+        ('#$v', f.copyWith(tags: ScrapFilter.toggled(f.tags, v)), null),
+      for (final v in f.splitFrom)
+        (
+          'split from $v',
+          f.copyWith(splitFrom: ScrapFilter.toggled(f.splitFrom, v)),
+          null,
+        ),
+      for (final v in f.statuses)
+        (v, f.copyWith(statuses: ScrapFilter.toggled(f.statuses, v)), null),
+      for (final v in f.sources)
+        (v, f.copyWith(sources: ScrapFilter.toggled(f.sources, v)), null),
+      if (_addedLabels[f.added] case final label?)
+        (label, f.copyWith(added: AddedWithin.any), null),
+      if (f.color case final hex?)
+        ('colour', f.copyWith(clearColor: true), hexColor(hex)),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final chips = _chips();
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      child: Row(
+        children: [
+          for (final (label, without, swatch) in chips)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: InputChip(
+                label: Text(label),
+                avatar: swatch == null
+                    ? null
+                    : CircleAvatar(radius: 7, backgroundColor: swatch),
+                backgroundColor: tokens.accentSoft,
+                side: BorderSide.none,
+                visualDensity: VisualDensity.compact,
+                deleteButtonTooltipMessage: 'Remove $label',
+                onDeleted: () => onChanged(without),
+              ),
+            ),
+        ],
       ),
     );
   }

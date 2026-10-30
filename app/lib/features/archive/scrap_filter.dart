@@ -14,6 +14,8 @@ class ScrapFilter {
     this.moods = const {},
     this.tags = const {},
     this.splitFrom = const {},
+    this.statuses = const {},
+    this.sources = const {},
     this.added = AddedWithin.any,
     this.color,
   });
@@ -28,6 +30,12 @@ class ScrapFilter {
 
   /// Parent labels, e.g. {"wrapper"} = elements split from wrappers.
   final Set<String> splitFrom;
+
+  /// [PhysicalStatus.label]s, e.g. {"Not used yet"}.
+  final Set<String> statuses;
+
+  /// [ScrapSource.label]s, e.g. {"Made by AI"}.
+  final Set<String> sources;
   final AddedWithin added;
 
   /// Hex colour, e.g. "#C8B496"; matches scraps with a similar palette colour.
@@ -39,6 +47,8 @@ class ScrapFilter {
       moods.isEmpty &&
       tags.isEmpty &&
       splitFrom.isEmpty &&
+      statuses.isEmpty &&
+      sources.isEmpty &&
       added == AddedWithin.any &&
       color == null;
 
@@ -48,6 +58,8 @@ class ScrapFilter {
     Set<String>? moods,
     Set<String>? tags,
     Set<String>? splitFrom,
+    Set<String>? statuses,
+    Set<String>? sources,
     AddedWithin? added,
     String? color,
     bool clearColor = false,
@@ -58,6 +70,8 @@ class ScrapFilter {
       moods: moods ?? this.moods,
       tags: tags ?? this.tags,
       splitFrom: splitFrom ?? this.splitFrom,
+      statuses: statuses ?? this.statuses,
+      sources: sources ?? this.sources,
       added: added ?? this.added,
       color: clearColor ? null : (color ?? this.color),
     );
@@ -96,6 +110,14 @@ List<Scrap> applyFilter(
           !filter.splitFrom.contains(s.splitFromLabel)) {
         return false;
       }
+      if (filter.statuses.isNotEmpty &&
+          !filter.statuses.contains(s.physicalStatus.label)) {
+        return false;
+      }
+      if (filter.sources.isNotEmpty &&
+          !filter.sources.contains(s.source.label)) {
+        return false;
+      }
       if (since != null && s.createdAt.isBefore(since)) return false;
       if (target != null && !_hasColor(s, target)) return false;
       if (words.isNotEmpty) {
@@ -117,6 +139,8 @@ class FilterFacets {
     required this.tags,
     required this.splitFrom,
     required this.colors,
+    this.statuses = const [],
+    this.sources = const [],
   });
 
   final List<String> types;
@@ -124,6 +148,10 @@ class FilterFacets {
   final List<String> tags;
   final List<String> splitFrom;
   final List<String> colors;
+
+  /// Every status, in order, so "Used in a spread" can be found before any is.
+  final List<String> statuses;
+  final List<String> sources;
 
   static const maxTags = 24;
   static const maxColors = 12;
@@ -148,6 +176,8 @@ class FilterFacets {
       tags: ranked(scraps.expand((s) => s.tags), maxTags),
       splitFrom: ranked(scraps.map((s) => s.splitFromLabel ?? '')),
       colors: ranked(scraps.map((s) => s.palette.firstOrNull ?? ''), maxColors),
+      statuses: List.unmodifiable(PhysicalStatus.values.map((s) => s.label)),
+      sources: ranked(scraps.map((s) => s.source.label)),
     );
   }
 }

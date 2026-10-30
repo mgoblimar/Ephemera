@@ -52,6 +52,12 @@ class _MemoryArchive implements ScrapRepository {
   Future<void> restore(Scrap scrap) async => _scraps.add(scrap);
 
   @override
+  Future<void> update(Scrap scrap) async {
+    final i = _scraps.indexWhere((s) => s.id == scrap.id);
+    if (i >= 0) _scraps[i] = scrap;
+  }
+
+  @override
   Object? noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -161,4 +167,68 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ScrapCard), findsNWidgets(3));
   });
+
+  testWidgets('an active filter chip removes just that filter', (tester) async {
+    await pumpArchive(tester, _archive);
+    await tester.tap(find.text('Vibe'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('cozy'));
+    await tester.pump();
+    await tester.tap(find.text('Show scraps'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ScrapCard), findsNWidgets(2));
+
+    await tester.tap(find.byTooltip('Remove cozy'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ScrapCard), findsNWidgets(3));
+    expect(find.byType(InputChip), findsNothing);
+  });
+
+  testWidgets(
+    'marking a scrap as used saves it and the Status filter finds it',
+    (tester) async {
+      final archive = _MemoryArchive(_archive);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            scrapRepositoryProvider.overrideWith((ref) async => archive),
+            scrapsProvider.overrideWith(
+              (ref) async =>
+                  (await ref.watch(scrapRepositoryProvider.future)).getAll(),
+            ),
+          ],
+          child: MaterialApp(theme: buildTheme(), home: const ArchiveScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('ticket scrap'));
+      await tester.pumpAndSettle();
+
+      await tester.dragUntilVisible(
+        find.text('Used in a spread'),
+        find.byType(ListView).last,
+        const Offset(0, -200),
+      );
+      await tester.tap(find.text('Used in a spread'));
+      await tester.pumpAndSettle();
+      expect(find.text('Theme Blend will leave it out.'), findsOneWidget);
+      expect(
+        (await archive.getAll()).firstWhere((s) => s.id == 't').physicalStatus,
+        PhysicalStatus.used,
+      );
+
+      await tester.tapAt(const Offset(10, 10)); // close the sheet
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Status'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Used in a spread'));
+      await tester.pump();
+      await tester.tap(find.text('Show scraps'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ScrapCard), findsOneWidget);
+      expect(find.bySemanticsLabel('ticket scrap'), findsOneWidget);
+    },
+  );
 }

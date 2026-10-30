@@ -151,7 +151,7 @@ A grid of every scrap ("scrapbook wall" in 4.8), with **filters that combine**: 
 | **Colour** (tap a swatch) | `palette` | Data ready |
 | **Split from** (e.g. "elements of the Sumo wrapper") | **new:** `split_from`: parent piece's label + capture, set when a Split element is cut | Needs a small data change |
 | **Date added** (today, this week, a date range) | `created_at` | Data ready |
-| **Availability** (unused / already used in a physical spread) | **new (next iteration):** `physical_status` + `used_in` note | Planned |
+| **Availability** (unused / already used in a physical spread) | `physical_status`: Not used yet / Used in a spread / Set aside, set in the scrap sheet; Theme Blend only gets "Not used yet" scraps (`used_in` note not built) | ✅ Built Oct 30 |
 
 **Next iteration: "physically used" tracking.** Journalers glue real scraps into real spreads, and then those scraps aren't available anymore.
 - Each scrap gets a status: `available` · `used` (glued into a physical spread) · optionally `reserved` (set aside for a planned spread). There's an optional note or link to which spread.

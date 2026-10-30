@@ -12,6 +12,7 @@ Future<void> showScrapDetail(
   BuildContext context,
   Scrap scrap, {
   VoidCallback? onRemove,
+  ValueChanged<PhysicalStatus>? onStatus,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -24,6 +25,7 @@ Future<void> showScrapDetail(
         scrap: scrap,
         controller: controller,
         onRemove: onRemove,
+        onStatus: onStatus,
       ),
     ),
   );
@@ -34,11 +36,13 @@ class _ScrapDetail extends StatelessWidget {
     required this.scrap,
     required this.controller,
     this.onRemove,
+    this.onStatus,
   });
 
   final Scrap scrap;
   final ScrollController controller;
   final VoidCallback? onRemove;
+  final ValueChanged<PhysicalStatus>? onStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +70,10 @@ class _ScrapDetail extends StatelessWidget {
           ].join(' · '),
           style: TextStyle(color: tokens.inkSoft),
         ),
+        if (onStatus != null) ...[
+          const SizedBox(height: 16),
+          _StatusPicker(initial: scrap.physicalStatus, onChanged: onStatus!),
+        ],
         if (scrap.tooWeakForAgent) ...[
           const SizedBox(height: 8),
           Row(
@@ -161,4 +169,48 @@ class _ScrapDetail extends StatelessWidget {
   }
 
   static String _two(int n) => n.toString().padLeft(2, '0');
+}
+
+/// Where the real scrap is now. Theme Blend skips used and set-aside scraps.
+class _StatusPicker extends StatefulWidget {
+  const _StatusPicker({required this.initial, required this.onChanged});
+
+  final PhysicalStatus initial;
+  final ValueChanged<PhysicalStatus> onChanged;
+
+  @override
+  State<_StatusPicker> createState() => _StatusPickerState();
+}
+
+class _StatusPickerState extends State<_StatusPicker> {
+  late PhysicalStatus _status = widget.initial;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SegmentedButton<PhysicalStatus>(
+          segments: [
+            for (final s in PhysicalStatus.values)
+              ButtonSegment(value: s, label: Text(s.label)),
+          ],
+          selected: {_status},
+          showSelectedIcon: false,
+          onSelectionChanged: (picked) {
+            setState(() => _status = picked.single);
+            widget.onChanged(picked.single);
+          },
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _status == PhysicalStatus.available
+              ? 'Theme Blend can use it.'
+              : 'Theme Blend will leave it out.',
+          style: TextStyle(color: tokens.inkSoft, fontSize: 13),
+        ),
+      ],
+    );
+  }
 }

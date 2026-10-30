@@ -74,6 +74,15 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
       setState(() => _error = 'Your archive is empty. Scan some scraps first.');
       return;
     }
+    final offered = _offeredToAgent(archive);
+    if (offered.isEmpty) {
+      setState(
+        () => _error =
+            'All your scraps are used or set aside. Mark some as not used yet, '
+            'or scan new ones.',
+      );
+      return;
+    }
     FocusScope.of(context).unfocus();
     setState(() {
       _planning = true;
@@ -88,7 +97,7 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
     try {
       final plan = await ref
           .read(proxyClientProvider)
-          .agentPlan(theme: theme, archive: _offeredToAgent(archive));
+          .agentPlan(theme: theme, archive: offered);
       if (!mounted) return;
       setState(() {
         _plan = plan;
@@ -106,11 +115,15 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
     }
   }
 
-  /// Leaves out slivers and specks that would look broken on a page, unless
-  /// that would leave the agent nothing to work with.
+  /// Only scraps still free in real life (not glued into a spread or set
+  /// aside), without slivers and specks that would look broken on a page -
+  /// unless dropping those would leave the agent nothing to work with.
   static List<Scrap> _offeredToAgent(List<Scrap> archive) {
-    final usable = archive.where((s) => !s.tooWeakForAgent).toList();
-    return usable.isEmpty ? archive : usable;
+    final free = archive
+        .where((s) => s.physicalStatus == PhysicalStatus.available)
+        .toList();
+    final usable = free.where((s) => !s.tooWeakForAgent).toList();
+    return usable.isEmpty ? free : usable;
   }
 
   Future<void> _build(BlendPlan plan, Map<String, Scrap> byId) async {

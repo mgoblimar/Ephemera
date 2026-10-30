@@ -123,4 +123,64 @@ void main() {
     expect(ScrapFilter.toggled(added, 'a'), {'b'});
     expect(base, {'a'});
   });
+
+  group('status and source', () {
+    final used = Scrap(
+      id: 'glued',
+      pngPath: '/g.png',
+      width: 1,
+      height: 1,
+      source: ScrapSource.capture,
+      createdAt: _now,
+      physicalStatus: PhysicalStatus.used,
+    );
+    final stamp = Scrap(
+      id: 'stamp',
+      pngPath: '/s.png',
+      width: 1,
+      height: 1,
+      source: ScrapSource.generated,
+      createdAt: _now,
+    );
+    final all = [..._archive, used, stamp];
+
+    test('the status filter finds scraps glued into spreads', () {
+      final shown = applyFilter(
+        all,
+        const ScrapFilter(statuses: {'Used in a spread'}),
+        now: _now,
+      );
+
+      expect(shown.map((s) => s.id), ['glued']);
+    });
+
+    test('the made-by filter finds AI decorations', () {
+      final shown = applyFilter(
+        all,
+        const ScrapFilter(sources: {'Made by AI'}),
+        now: _now,
+      );
+
+      expect(shown.map((s) => s.id), ['stamp']);
+    });
+
+    test('facets list every status but only the sources present', () {
+      final facets = FilterFacets.of(all);
+
+      expect(facets.statuses, [
+        'Not used yet',
+        'Used in a spread',
+        'Set aside',
+      ]);
+      expect(facets.sources, ['Scanned', 'Made by AI']);
+    });
+
+    test('status is saved, and old scraps without one are available', () {
+      final json = used.toJson();
+      expect(Scrap.fromJson(json).physicalStatus, PhysicalStatus.used);
+
+      json.remove('physical_status');
+      expect(Scrap.fromJson(json).physicalStatus, PhysicalStatus.available);
+    });
+  });
 }

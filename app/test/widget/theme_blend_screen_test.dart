@@ -156,6 +156,7 @@ void main() {
     WidgetTester tester,
     List<http.Request> log, {
     bool layoutFails = false,
+    List<Scrap>? archive,
   }) async {
     final repository = FileJournalRepository(root);
     final journal = (await tester.runAsync(() => repository.create('Kyoto')))!;
@@ -168,7 +169,7 @@ void main() {
               httpClient: fakeProxy((r) => _respond(r, layoutFails), log: log),
             ),
           ),
-          scrapsProvider.overrideWith((ref) async => _archive),
+          scrapsProvider.overrideWith((ref) async => archive ?? _archive),
           scrapRepositoryProvider.overrideWith(
             (ref) async =>
                 FileScrapRepository(Directory('${root.path}/archive')),
@@ -338,4 +339,38 @@ void main() {
     );
     expect(scraps, hasLength(3)); // simple cascade, decoration included
   });
+
+  testWidgets(
+    'scraps used in real spreads and tiny slivers never reach the agent',
+    (tester) async {
+      final log = <http.Request>[];
+      final glued = Scrap(
+        id: 'glued',
+        pngPath: '/missing/glued.png',
+        width: 100,
+        height: 150,
+        source: ScrapSource.capture,
+        createdAt: DateTime.utc(2026, 10, 31),
+        physicalStatus: PhysicalStatus.used,
+      );
+      final sliver = Scrap(
+        id: 'sliver',
+        pngPath: '/missing/sliver.png',
+        width: 40,
+        height: 340,
+        source: ScrapSource.capture,
+        createdAt: DateTime.utc(2026, 10, 31),
+        splitFromLabel: 'wrapper',
+      );
+      await pumpBlend(tester, log, archive: [..._archive, glued, sliver]);
+
+      await tester.enterText(find.byType(TextField), 'slow sunday');
+      await tester.tap(find.text('Plan a page'));
+      await tester.pumpAndSettle();
+
+      final sent = jsonDecode(log.single.body) as Map<String, dynamic>;
+      final ids = [for (final s in sent['archive'] as List) s['id']];
+      expect(ids, ['r1', 't1', 'w1']);
+    },
+  );
 }

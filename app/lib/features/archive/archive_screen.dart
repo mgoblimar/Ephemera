@@ -67,6 +67,10 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
           searchController: _search,
           onChanged: (f) => setState(() => _filter = f),
         ),
+        ActiveFilterChips(
+          filter: _filter,
+          onChanged: (f) => setState(() => _filter = f),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
           child: Row(
@@ -89,13 +93,27 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
               : ZeroWidthGuard(
                   child: ScrapWall(
                     scraps: shown,
-                    onTap: (s) =>
-                        showScrapDetail(context, s, onRemove: () => _remove(s)),
+                    onTap: (s) => showScrapDetail(
+                      context,
+                      s,
+                      onRemove: () => _remove(s),
+                      onStatus: (status) => _setStatus(s, status),
+                    ),
                   ),
                 ),
         ),
       ],
     );
+  }
+
+  Future<void> _setStatus(Scrap scrap, PhysicalStatus status) async {
+    final repository = await ref.read(scrapRepositoryProvider.future);
+    // Re-read so a background enrichment that landed meanwhile isn't undone.
+    final latest = (await repository.getAll()).where((s) => s.id == scrap.id);
+    await repository.update(
+      (latest.firstOrNull ?? scrap).copyWith(physicalStatus: status),
+    );
+    ref.invalidate(scrapsProvider);
   }
 
   /// Removes a junk scrap, with a few seconds to change your mind.
