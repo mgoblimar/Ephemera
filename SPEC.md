@@ -362,8 +362,8 @@ Solo build: features are built **vertically** (app screen + its proxy endpoint t
 
 | Day | Build | End-of-day check |
 |---|---|---|
-| **1** | Scaffold the Flutter app + FastAPI proxy, response envelope, mock providers. **Confirm the hackathon key serves `muse-wonder-1.0` with one test tool call, plus SAM edge format and quotas.** Capture screen | App takes a photo and gets mock masks back from the proxy |
-| **2** | Real SAM 3.1 adapter (auto + tap), mask review screen, cut styles, save to the Archive | Real cutouts of real scraps in the Archive |
+| **1** ✅ | Done: Flutter app + FastAPI proxy with mocks; capture, mask review, tap-to-add, cut styles, save to the Archive (pulled forward from Day 2); Muse Wonder tool calling confirmed with the real key; SAM/pricing docs read | ✅ Mock hero flow works end to end; 25 proxy + 14 app tests pass |
+| **2** | Real providers behind `USE_REAL_PROVIDERS`: SAM 3.1 adapter (box + point prompts, `meta-sam-parser` decode, upsample + feather masks); Muse Spark detection (boxes + labels) for auto-detect Plan A; test Plan A vs Plan B on 3 real desk photos; confirm contributor mode accepts images; first run on the tablet | Real cutouts of real scraps in the Archive, on the tablet |
 | **3** | Canvas editor (transforms, layers, text, undo/redo, PNG export) + library and book flip (package) | **Cut-line check:** the full hero flow works on the device |
 | **4** | Enrichment (OCR + tags + palette) + agent plan with `search_archive`, SSE progress, plan cards UI | A theme prompt returns an approvable plan |
 | **5** | Agent build (layout step + validation). If on track: `generate_ephemera`, freehand, prompts (P2). **Feature freeze tonight** | Agent builds a page end-to-end; demo assets cached |
