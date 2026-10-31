@@ -66,7 +66,7 @@ class LayoutRequest(BaseModel):
     title: str = Field(default="", max_length=120)
     layout_intent: str = Field(default="", max_length=400)
     paper: str = Field(default="cream", max_length=20)
-    scraps: list[LayoutScrapIn] = Field(min_length=1, max_length=12)
+    scraps: list[LayoutScrapIn] = Field(min_length=1, max_length=20)  # 15 scraps + 4 decorations
     captions: list[str] = Field(default_factory=list, max_length=3)
 
 

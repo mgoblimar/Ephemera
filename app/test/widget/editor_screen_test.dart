@@ -23,13 +23,16 @@ void main() {
   });
   tearDown(() async => root.delete(recursive: true));
 
-  Future<Journal> pumpEditor(WidgetTester tester) async {
+  Future<Journal> pumpEditor(
+    WidgetTester tester, {
+    List<Scrap> scraps = const [],
+  }) async {
     final journal = (await tester.runAsync(() => repository.create('Kyoto')))!;
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           journalRepositoryProvider.overrideWith((ref) async => repository),
-          scrapsProvider.overrideWith((ref) async => const <Scrap>[]),
+          scrapsProvider.overrideWith((ref) async => scraps),
         ],
         child: MaterialApp(
           home: EditorScreen(journal: journal, pageId: journal.pages.single.id),
@@ -112,6 +115,41 @@ void main() {
     );
   });
 
+  testWidgets('the scrap picker can be searched like the archive', (
+    tester,
+  ) async {
+    Scrap scrap(String id, String type, String ocr) => Scrap(
+      id: id,
+      pngPath: '/missing/$id.png',
+      width: 100,
+      height: 100,
+      source: ScrapSource.capture,
+      createdAt: DateTime.utc(2026, 10, 31),
+      type: type,
+      ocrText: ocr,
+      enriched: true,
+    );
+    await pumpEditor(
+      tester,
+      scraps: [
+        scrap('r', 'receipt', 'Cafe Lumiere'),
+        scrap('t', 'ticket', 'Bus P20'),
+      ],
+    );
+    await tester.tap(find.text('Scrap'));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('receipt scrap'), findsOneWidget);
+    expect(find.bySemanticsLabel('ticket scrap'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'bus');
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('receipt scrap'), findsNothing);
+    await tester.tap(find.bySemanticsLabel('ticket scrap'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add a scrap'), findsNothing); // picked and closed
+  });
+
   testWidgets('drawing adds a stroke you can undo', (tester) async {
     await pumpEditor(tester);
     await tester.tap(find.text('Draw'));
@@ -135,6 +173,38 @@ void main() {
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
     expect(find.text('Draw'), findsOneWidget);
+  });
+
+  testWidgets('the eraser lifts off a line it passes over; undo restores it', (
+    tester,
+  ) async {
+    await pumpEditor(tester);
+    await tester.tap(find.text('Draw'));
+    await tester.pumpAndSettle();
+    final start = tester.getCenter(find.byType(DrawLayer));
+    final pen = await tester.startGesture(start);
+    for (var i = 0; i < 10; i++) {
+      await pen.moveBy(const Offset(8, 0));
+      await tester.pump();
+    }
+    await pen.up();
+    await tester.pumpAndSettle();
+    expect(find.byType(StrokeView), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Eraser'));
+    await tester.pump();
+    final eraser = await tester.startGesture(start + const Offset(40, -30));
+    for (var i = 0; i < 6; i++) {
+      await eraser.moveBy(const Offset(0, 10));
+      await tester.pump();
+    }
+    await eraser.up();
+    await tester.pumpAndSettle();
+    expect(find.byType(StrokeView), findsNothing);
+
+    await tester.tap(find.byTooltip('Undo'));
+    await tester.pumpAndSettle();
+    expect(find.byType(StrokeView), findsOneWidget);
   });
 
   testWidgets('a selected caption can be recoloured, and undo restores it', (

@@ -27,10 +27,20 @@ Size _shownSize(Scrap scrap, double inner) {
 /// Scraps pinned to a wall: masonry columns, each scrap on a paper mat with a
 /// slight tilt and the odd strip of washi tape.
 class ScrapWall extends StatelessWidget {
-  const ScrapWall({super.key, required this.scraps, required this.onTap});
+  const ScrapWall({
+    super.key,
+    required this.scraps,
+    required this.onTap,
+    this.onLongPress,
+    this.selected = const {},
+  });
 
   final List<Scrap> scraps;
   final ValueChanged<Scrap> onTap;
+  final ValueChanged<Scrap>? onLongPress;
+
+  /// Ids of scraps picked in selection mode; shown ticked.
+  final Set<String> selected;
 
   static int columnsFor(double width) => width >= 900
       ? 5
@@ -66,6 +76,10 @@ class ScrapWall extends StatelessWidget {
                             scrap: scrap,
                             width: columnWidth,
                             onTap: () => onTap(scrap),
+                            onLongPress: onLongPress == null
+                                ? null
+                                : () => onLongPress!(scrap),
+                            selected: selected.contains(scrap.id),
                           ),
                         ),
                     ],
@@ -108,11 +122,15 @@ class ScrapCard extends StatelessWidget {
     required this.scrap,
     required this.width,
     required this.onTap,
+    this.onLongPress,
+    this.selected = false,
   });
 
   final Scrap scrap;
   final double width;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -125,6 +143,7 @@ class ScrapCard extends StatelessWidget {
     return Semantics(
       label: '${scrap.type} scrap',
       button: true,
+      selected: selected,
       child: Transform.rotate(
         angle: tilt,
         child: Stack(
@@ -139,6 +158,7 @@ class ScrapCard extends StatelessWidget {
               ),
               child: InkWell(
                 onTap: onTap,
+                onLongPress: onLongPress,
                 borderRadius: BorderRadius.circular(
                   tokens.cardRadius * _matRoundness,
                 ),
@@ -149,6 +169,9 @@ class ScrapCard extends StatelessWidget {
                     ),
                     boxShadow: tokens.shadow,
                     color: tokens.surface,
+                    border: selected
+                        ? Border.all(color: tokens.accent, width: 3)
+                        : null,
                   ),
                   padding: const EdgeInsets.all(_matPadding),
                   child: SizedBox.fromSize(
@@ -180,6 +203,16 @@ class ScrapCard extends StatelessWidget {
                         ? PawPrints(color: Colors.white.withValues(alpha: 0.8))
                         : null,
                   ),
+                ),
+              ),
+            if (selected)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: CircleAvatar(
+                  radius: 13,
+                  backgroundColor: tokens.accent,
+                  child: const Icon(Icons.check, size: 18, color: Colors.white),
                 ),
               ),
           ],

@@ -52,6 +52,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   /// Draw mode: the pen is on, strokes are added as they're finished.
   bool _drawing = false;
+  bool _erasing = false;
   double _penWidth = penWidths[1];
   Color? _penColor; // null: the theme's ink
   final _boundaryKey = GlobalKey();
@@ -202,6 +203,18 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   });
 
   void _addStroke(List<Offset> points, Size pageSize) {
+    if (_erasing) {
+      final gone = strokesErasedBy(_live.elements, points, pageSize);
+      if (gone.isNotEmpty) {
+        _commit(
+          _live.withElements([
+            for (final e in _live.elements)
+              if (!gone.contains(e.id)) e,
+          ]),
+        );
+      }
+      return;
+    }
     final element = strokeElement(
       id: _uuid.v4(),
       points: points,
@@ -322,6 +335,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                               thickness: _penWidth,
                               color: _penColor ?? context.tokens.ink,
                               onStroke: _addStroke,
+                              erasing: _erasing,
                             ),
                           ),
                       ],
@@ -335,9 +349,20 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 child: DrawBar(
                   thickness: _penWidth,
                   color: _penColor ?? context.tokens.ink,
-                  onThickness: (w) => setState(() => _penWidth = w),
-                  onColor: (c) => setState(() => _penColor = c),
-                  onDone: () => setState(() => _drawing = false),
+                  erasing: _erasing,
+                  onEraser: () => setState(() => _erasing = true),
+                  onThickness: (w) => setState(() {
+                    _penWidth = w;
+                    _erasing = false;
+                  }),
+                  onColor: (c) => setState(() {
+                    _penColor = c;
+                    _erasing = false;
+                  }),
+                  onDone: () => setState(() {
+                    _drawing = false;
+                    _erasing = false;
+                  }),
                 ),
               )
             else if (_selected != null)

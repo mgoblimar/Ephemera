@@ -64,7 +64,7 @@ On the Android emulator the default `http://10.0.2.2:8000` works without `--dart
 ## Tests and checks
 
 ```bash
-# proxy (from proxy/): 102 tests, all mocked, free
+# proxy (from proxy/): 109 tests, all mocked, free
 .venv/Scripts/python -m pytest -q
 
 # app (from app/)

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 MAX_TOOL_CALLS = 8
 MAX_TURNS = 6
 MAX_SEARCH_ROUNDS = 1  # one parallel round, then the plan: every extra turn costs Wonder ~15-50 s
-MAX_PLAN_SCRAPS = 8
+MAX_PLAN_SCRAPS = 15  # the app shows them all ticked; the user unticks extras
 MAX_CAPTIONS = 3
 MAX_EPHEMERA = 4
 PAPERS = ("cream", "kraft", "dots")
@@ -47,7 +47,8 @@ SEARCH_TOOL = {
 INSTRUCTIONS = f"""You are Theme Blend, a junk-journal page designer working with the user's real scraps.
 1. Search the archive once: make 3-5 search_archive calls together in your first reply (different phrasings: objects,
 moods, colours). You won't get to search again, so cover the theme in that one go.
-2. Choose {3}-{MAX_PLAN_SCRAPS} scraps that belong together on one page. Always include pinned scraps.
+2. Choose 6-{MAX_PLAN_SCRAPS} scraps that could belong on this page, best fit first; the user unticks the ones they
+skip, so offer every good candidate. Always include pinned scraps.
 3. Reply with only this JSON:
 {{"title": short page title,
  "palette": 4-6 hex colours that harmonise with the theme and chosen scraps,

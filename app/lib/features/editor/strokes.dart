@@ -8,6 +8,9 @@ import 'package:ephemera_ai/theme.dart';
 /// Pen thicknesses, as fractions of the page width.
 const penWidths = [0.006, 0.012, 0.024];
 
+/// Eraser reach (radius), as a fraction of the page width.
+const eraserRadius = 0.02;
+
 /// Pen colours: the theme's ink, accent and secondary, plus a blue and a gold.
 List<Color> penColors(EphemeraTokens tokens) => [
   tokens.ink,
@@ -48,6 +51,85 @@ PageElement? strokeElement({
     ]),
     penWidth: thickness / width,
   );
+}
+
+/// Ids of the pen strokes an eraser drag at [path] (page pixels) passes over.
+/// Whole strokes are erased, like lifting off a line of washi.
+Set<String> strokesErasedBy(
+  List<PageElement> elements,
+  List<Offset> path,
+  Size pageSize,
+) {
+  if (path.isEmpty || pageSize.isEmpty) return const {};
+  final reach = eraserRadius * pageSize.width;
+  return {
+    for (final e in elements)
+      if (e.kind == ElementKind.stroke &&
+          _lineGap(_strokePoints(e, pageSize).toList(), path) <=
+              reach + e.penWidth * e.size * pageSize.width / 2)
+        e.id,
+  };
+}
+
+/// Closest distance between two polylines (fast drags leave gaps between
+/// points, so segments are compared, not just points).
+double _lineGap(List<Offset> a, List<Offset> b) {
+  if (a.isEmpty || b.isEmpty) return double.infinity;
+  for (var i = 0; i + 1 < a.length; i++) {
+    for (var j = 0; j + 1 < b.length; j++) {
+      if (_cross(a[i], a[i + 1], b[j], b[j + 1])) return 0;
+    }
+  }
+  var gap = double.infinity;
+  for (final p in a) {
+    gap = math.min(gap, _toLine(p, b));
+  }
+  for (final p in b) {
+    gap = math.min(gap, _toLine(p, a));
+  }
+  return gap;
+}
+
+/// Whether segments p1-p2 and q1-q2 cross.
+bool _cross(Offset p1, Offset p2, Offset q1, Offset q2) {
+  double side(Offset a, Offset b, Offset c) =>
+      (b.dx - a.dx) * (c.dy - a.dy) - (b.dy - a.dy) * (c.dx - a.dx);
+  final d1 = side(q1, q2, p1), d2 = side(q1, q2, p2);
+  final d3 = side(p1, p2, q1), d4 = side(p1, p2, q2);
+  return d1 * d2 < 0 && d3 * d4 < 0;
+}
+
+double _toLine(Offset p, List<Offset> line) {
+  if (line.length == 1) return (p - line.first).distance;
+  var best = double.infinity;
+  for (var i = 0; i + 1 < line.length; i++) {
+    best = math.min(best, _toSegment(p, line[i], line[i + 1]));
+  }
+  return best;
+}
+
+double _toSegment(Offset p, Offset a, Offset b) {
+  final ab = b - a;
+  final lengthSquared = ab.distanceSquared;
+  if (lengthSquared == 0) return (p - a).distance;
+  final t = (((p - a).dx * ab.dx + (p - a).dy * ab.dy) / lengthSquared).clamp(
+    0.0,
+    1.0,
+  );
+  return (p - (a + ab * t)).distance;
+}
+
+/// A stroke's points on the page, in page pixels (after move, scale and turn).
+Iterable<Offset> _strokePoints(PageElement e, Size pageSize) sync* {
+  final width = e.size * pageSize.width;
+  final height = width * e.imageAspect;
+  final centre = Offset(e.cx * pageSize.width, e.cy * pageSize.height);
+  final cos = math.cos(e.rotation), sin = math.sin(e.rotation);
+  for (var i = 0; i + 1 < e.points.length; i += 2) {
+    final x = e.points[i] * width - width / 2;
+    final y = e.points[i + 1] * width - height / 2;
+    yield centre + Offset(x * cos - y * sin, x * sin + y * cos);
+  }
 }
 
 /// Draws a stroke element at [width] logical pixels wide.
@@ -126,12 +208,17 @@ class DrawLayer extends StatefulWidget {
     required this.thickness,
     required this.color,
     required this.onStroke,
+    this.erasing = false,
   });
 
   /// Pen thickness as a fraction of the layer's width.
   final double thickness;
   final Color color;
   final void Function(List<Offset> points, Size size) onStroke;
+
+  /// Shows a soft eraser trail instead of ink; [onStroke] then gets the
+  /// eraser's path.
+  final bool erasing;
 
   @override
   State<DrawLayer> createState() => _DrawLayerState();
@@ -173,8 +260,10 @@ class _DrawLayerState extends State<DrawLayer> {
             size: size,
             painter: _StrokePainter(
               points: _points,
-              thickness: widget.thickness * size.width,
-              color: widget.color,
+              thickness: widget.erasing
+                  ? eraserRadius * 2 * size.width
+                  : widget.thickness * size.width,
+              color: widget.erasing ? const Color(0x33888888) : widget.color,
             ),
           ),
         );
@@ -192,6 +281,8 @@ class DrawBar extends StatelessWidget {
     required this.onThickness,
     required this.onColor,
     required this.onDone,
+    this.erasing = false,
+    this.onEraser,
   });
 
   final double thickness;
@@ -199,6 +290,10 @@ class DrawBar extends StatelessWidget {
   final ValueChanged<double> onThickness;
   final ValueChanged<Color> onColor;
   final VoidCallback onDone;
+  final bool erasing;
+
+  /// Picks the eraser; choosing a pen size or colour goes back to the pen.
+  final VoidCallback? onEraser;
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +304,7 @@ class DrawBar extends StatelessWidget {
         for (final (i, w) in penWidths.indexed)
           _Choice(
             label: '${const ['Fine', 'Medium', 'Bold'][i]} pen',
-            selected: w == thickness,
+            selected: !erasing && w == thickness,
             onTap: () => onThickness(w),
             child: Container(
               width: 6.0 + i * 6,
@@ -225,13 +320,20 @@ class DrawBar extends StatelessWidget {
         for (final c in penColors(tokens))
           _Choice(
             label: 'Colour',
-            selected: c == color,
+            selected: !erasing && c == color,
             onTap: () => onColor(c),
             child: Container(
               width: 22,
               height: 22,
               decoration: BoxDecoration(color: c, shape: BoxShape.circle),
             ),
+          ),
+        if (onEraser != null)
+          _Choice(
+            label: 'Eraser',
+            selected: erasing,
+            onTap: onEraser!,
+            child: const _EraserIcon(),
           ),
         FilledButton.icon(
           onPressed: onDone,
@@ -241,6 +343,31 @@ class DrawBar extends StatelessWidget {
       ],
     );
   }
+}
+
+/// A little two-tone eraser block (Material has no eraser icon).
+class _EraserIcon extends StatelessWidget {
+  const _EraserIcon();
+
+  @override
+  Widget build(BuildContext context) => Transform.rotate(
+    angle: -0.6,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: const SizedBox(
+        width: 24,
+        height: 12,
+        child: Row(
+          // Childless boxes have no height of their own; stretch fills it.
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: ColoredBox(color: Color(0xFFE8A0A8))),
+            Expanded(child: ColoredBox(color: Color(0xFF8C9BB0))),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _Choice extends StatelessWidget {

@@ -15,6 +15,7 @@ Future<void> showScrapDetail(
   VoidCallback? onRemove,
   ValueChanged<PhysicalStatus>? onStatus,
   ValueChanged<String>? onUsedIn,
+  String? suggestedNote,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -29,6 +30,7 @@ Future<void> showScrapDetail(
         onRemove: onRemove,
         onStatus: onStatus,
         onUsedIn: onUsedIn,
+        suggestedNote: suggestedNote,
       ),
     ),
   );
@@ -41,6 +43,7 @@ class _ScrapDetail extends StatelessWidget {
     this.onRemove,
     this.onStatus,
     this.onUsedIn,
+    this.suggestedNote,
   });
 
   final Scrap scrap;
@@ -48,6 +51,7 @@ class _ScrapDetail extends StatelessWidget {
   final VoidCallback? onRemove;
   final ValueChanged<PhysicalStatus>? onStatus;
   final ValueChanged<String>? onUsedIn;
+  final String? suggestedNote;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +84,7 @@ class _ScrapDetail extends StatelessWidget {
           _StatusPicker(
             initial: scrap.physicalStatus,
             initialNote: scrap.usedIn,
+            suggestedNote: suggestedNote,
             onChanged: onStatus!,
             onNote: onUsedIn,
           ),
@@ -191,12 +196,16 @@ class _StatusPicker extends StatefulWidget {
     required this.initial,
     required this.onChanged,
     this.initialNote = '',
+    this.suggestedNote,
     this.onNote,
   });
 
   final PhysicalStatus initial;
   final ValueChanged<PhysicalStatus> onChanged;
   final String initialNote;
+
+  /// Filled in (and saved) when the scrap is marked used with no note yet.
+  final String? suggestedNote;
 
   /// Saves the used-in note; null hides the field.
   final ValueChanged<String>? onNote;
@@ -247,6 +256,13 @@ class _StatusPickerState extends State<_StatusPicker> {
           onSelectionChanged: (picked) {
             setState(() => _status = picked.single);
             widget.onChanged(picked.single);
+            final suggestion = widget.suggestedNote;
+            if (picked.single == PhysicalStatus.used &&
+                suggestion != null &&
+                _note.text.trim().isEmpty) {
+              _note.text = suggestion;
+              _saveNote();
+            }
           },
         ),
         const SizedBox(height: 6),

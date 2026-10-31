@@ -6,6 +6,7 @@ import 'package:ephemera_ai/data/scrap_repository.dart';
 import 'package:ephemera_ai/features/archive/archive_screen.dart';
 import 'package:ephemera_ai/features/archive/archive_wall.dart';
 import 'package:ephemera_ai/features/editor/handwriting.dart';
+import 'package:ephemera_ai/models/journal.dart';
 import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/providers.dart';
 import 'package:ephemera_ai/theme.dart';
@@ -281,5 +282,108 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'kyoto');
     await tester.pumpAndSettle();
     expect(find.byType(ScrapCard), findsOneWidget);
+  });
+
+  Future<_MemoryArchive> pumpEditable(
+    WidgetTester tester, {
+    List<Journal> journals = const [],
+  }) async {
+    final archive = _MemoryArchive(_archive);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          scrapRepositoryProvider.overrideWith((ref) async => archive),
+          scrapsProvider.overrideWith(
+            (ref) async =>
+                (await ref.watch(scrapRepositoryProvider.future)).getAll(),
+          ),
+          journalsProvider.overrideWith((ref) async => journals),
+        ],
+        child: MaterialApp(theme: buildTheme(), home: const ArchiveScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    return archive;
+  }
+
+  testWidgets('several scraps can be picked and removed at once', (
+    tester,
+  ) async {
+    final archive = await pumpEditable(tester);
+
+    await tester.longPress(find.bySemanticsLabel('ticket scrap'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('sticker scrap'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 selected'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Remove from archive'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ScrapCard), findsOneWidget);
+    expect(await archive.getAll(), hasLength(1));
+    expect(find.text('Removed 2 scraps from your archive.'), findsOneWidget);
+    expect(find.text('Scrap archive'), findsOneWidget); // selection mode ended
+  });
+
+  testWidgets('the undo message goes away by itself', (tester) async {
+    await pumpEditable(tester);
+    await tester.longPress(find.bySemanticsLabel('ticket scrap'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Remove from archive'));
+    await tester.pumpAndSettle();
+    expect(find.text('Undo'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Undo'), findsNothing);
+  });
+
+  testWidgets('picked scraps can be marked as used together', (tester) async {
+    final archive = await pumpEditable(
+      tester,
+      journals: [
+        Journal(
+          id: 'j',
+          title: 'Kyoto',
+          createdAt: DateTime.utc(2026, 10, 31),
+          pages: const [
+            JournalPage(id: 'p1'),
+            JournalPage(
+              id: 'p2',
+              elements: [
+                PageElement(
+                  id: 'e',
+                  kind: ElementKind.scrap,
+                  cx: 0.5,
+                  cy: 0.5,
+                  size: 0.3,
+                  scrapId: 't',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+    await tester.longPress(find.bySemanticsLabel('ticket scrap'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('receipt scrap'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Set status'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(PhysicalStatus.used.label).last);
+    await tester.pumpAndSettle();
+
+    final used = (await archive.getAll())
+        .where((s) => s.physicalStatus == PhysicalStatus.used)
+        .map((s) => s.id);
+    expect(used, unorderedEquals(['t', 'r']));
+    // The ticket is on a page, so its note is filled in; the receipt isn't.
+    final notes = {for (final s in await archive.getAll()) s.id: s.usedIn};
+    expect(notes['t'], 'Kyoto, page 2');
+    expect(notes['r'], '');
   });
 }

@@ -3,29 +3,46 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:ephemera_ai/features/archive/archive_filter_bar.dart';
+import 'package:ephemera_ai/features/archive/scrap_filter.dart';
 import 'package:ephemera_ai/features/editor/handwriting.dart';
 import 'package:ephemera_ai/models/journal.dart';
 import 'package:ephemera_ai/models/scrap.dart';
 import 'package:ephemera_ai/providers.dart';
 import 'package:ephemera_ai/theme.dart';
 
-/// Bottom sheet listing archive scraps; returns the tapped one.
+/// Bottom sheet listing archive scraps, with the archive's filters; returns
+/// the tapped one.
 Future<Scrap?> pickScrap(BuildContext context) {
   return showModalBottomSheet<Scrap>(
     context: context,
     isScrollControlled: true,
     builder: (_) => const FractionallySizedBox(
-      heightFactor: 0.7,
+      heightFactor: 0.85,
       child: _ScrapPickerSheet(),
     ),
   );
 }
 
-class _ScrapPickerSheet extends ConsumerWidget {
+class _ScrapPickerSheet extends ConsumerStatefulWidget {
   const _ScrapPickerSheet();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ScrapPickerSheet> createState() => _ScrapPickerSheetState();
+}
+
+class _ScrapPickerSheetState extends ConsumerState<_ScrapPickerSheet> {
+  final _search = TextEditingController();
+  ScrapFilter _filter = ScrapFilter.none;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final scraps = ref.watch(scrapsProvider);
     return Column(
       children: [
@@ -41,17 +58,46 @@ class _ScrapPickerSheet extends ConsumerWidget {
                       'Your archive is empty. Scan some scraps first.',
                     ),
                   )
-                : GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 120,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                        ),
-                    itemCount: items.length,
-                    itemBuilder: (context, i) => InkWell(
-                      onTap: () => Navigator.pop(context, items[i]),
+                : _filtered(items),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text("Couldn't load scraps: $e")),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _filtered(List<Scrap> all) {
+    final shown = applyFilter(all, _filter);
+    return Column(
+      children: [
+        ArchiveFilterBar(
+          filter: _filter,
+          facets: FilterFacets.of(all),
+          searchController: _search,
+          onChanged: (f) => setState(() => _filter = f),
+        ),
+        ActiveFilterChips(
+          filter: _filter,
+          onChanged: (f) => setState(() => _filter = f),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: shown.isEmpty
+              ? const Center(child: Text('No scraps match'))
+              : GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 120,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                  ),
+                  itemCount: shown.length,
+                  itemBuilder: (context, i) => Semantics(
+                    label: '${shown[i].type} scrap',
+                    button: true,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(context, shown[i]),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: context.tokens.paperDeep,
@@ -60,17 +106,16 @@ class _ScrapPickerSheet extends ConsumerWidget {
                         child: Padding(
                           padding: const EdgeInsets.all(6),
                           child: Image.file(
-                            File(items[i].pngPath),
+                            File(shown[i].pngPath),
                             fit: BoxFit.contain,
                             cacheWidth: 240,
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
                           ),
                         ),
                       ),
                     ),
                   ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text("Couldn't load scraps: $e")),
-          ),
+                ),
         ),
       ],
     );

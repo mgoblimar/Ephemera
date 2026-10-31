@@ -41,6 +41,9 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
   BlendPlan? _plan;
   Set<String> _dropped = const {};
 
+  /// Archive scraps the agent didn't pick but the user ticked in "More".
+  Set<String> _added = const {};
+
   /// Indexes of the plan's decorations the user turned off.
   Set<int> _skippedDecorations = const {};
   bool _planning = false;
@@ -102,7 +105,11 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
       setState(() {
         _plan = plan;
         _dropped = const {};
-        _skippedDecorations = const {};
+        _added = const {};
+        // AI decorations are opt-in: all start switched off.
+        _skippedDecorations = Set.unmodifiable({
+          for (var i = 0; i < plan.ephemera.length; i++) i,
+        });
         if (plan.scraps.isEmpty) {
           _error = 'No scraps matched that theme. Try other words.';
         }
@@ -130,6 +137,8 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
     final scraps = [
       for (final s in plan.scraps)
         if (!_dropped.contains(s.id) && byId[s.id] != null) byId[s.id]!,
+      for (final id in _added)
+        if (byId[id] != null) byId[id]!,
     ];
     final decorations = [
       for (final (i, e) in plan.ephemera.indexed)
@@ -244,11 +253,10 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final byId = {
-      for (final s in ref.watch(scrapsProvider).valueOrNull ?? const <Scrap>[])
-        s.id: s,
-    };
+    final archive = ref.watch(scrapsProvider).valueOrNull ?? const <Scrap>[];
+    final byId = {for (final s in archive) s.id: s};
     final plan = _plan;
+    final planned = {...?plan?.scraps.map((s) => s.id)};
     return Scaffold(
       appBar: AppBar(title: const Text('Theme Blend')),
       body: SafeArea(
@@ -290,13 +298,15 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
                 plan: plan,
                 byId: byId,
                 dropped: _dropped,
-                onToggle: (id) => setState(() {
-                  _dropped = Set.unmodifiable(
-                    _dropped.contains(id)
-                        ? (Set.of(_dropped)..remove(id))
-                        : {..._dropped, id},
-                  );
-                }),
+                onToggle: (id) =>
+                    setState(() => _dropped = _flip(_dropped, id)),
+                more: [
+                  for (final s in _offeredToAgent(archive))
+                    if (!planned.contains(s.id)) s,
+                ],
+                added: _added,
+                onToggleMore: (id) =>
+                    setState(() => _added = _flip(_added, id)),
                 skippedDecorations: _skippedDecorations,
                 onToggleDecoration: (i) => setState(() {
                   _skippedDecorations = Set.unmodifiable(
@@ -314,6 +324,13 @@ class _ThemeBlendScreenState extends ConsumerState<ThemeBlendScreen> {
     );
   }
 }
+
+Set<String> _flip(Set<String> set, String id) => Set.unmodifiable(
+  set.contains(id) ? (Set.of(set)..remove(id)) : {...set, id},
+);
+
+/// A page holds at most this many scraps (agent picks plus any added).
+const maxPageScraps = 15;
 
 class _Planning extends StatelessWidget {
   const _Planning({required this.message});
@@ -352,7 +369,15 @@ class PlanCards extends StatelessWidget {
     this.skippedDecorations = const {},
     this.onToggleDecoration,
     this.buildStep,
+    this.more = const [],
+    this.added = const {},
+    this.onToggleMore,
   });
+
+  /// Other free scraps the agent didn't pick, offered unticked.
+  final List<Scrap> more;
+  final Set<String> added;
+  final ValueChanged<String>? onToggleMore;
 
   final BlendPlan plan;
 
@@ -368,7 +393,9 @@ class PlanCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final kept = plan.scraps.where((s) => !dropped.contains(s.id)).length;
+    final kept =
+        plan.scraps.where((s) => !dropped.contains(s.id)).length + added.length;
+    final full = kept >= maxPageScraps;
     final decorations = plan.ephemera.length - skippedDecorations.length;
     final building = buildStep != null;
     return Column(
@@ -398,12 +425,44 @@ class PlanCards extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 16),
+        Text(
+          '$kept of ${plan.scraps.length + more.length} ticked · untick what you '
+          "don't want (up to $maxPageScraps)",
+          style: TextStyle(color: tokens.inkSoft),
+        ),
+        const SizedBox(height: 8),
         for (final s in plan.scraps)
           _PlanScrapRow(
             scrap: byId[s.id],
             reason: s.reason,
             kept: !dropped.contains(s.id),
-            onTap: () => onToggle(s.id),
+            onTap: full && dropped.contains(s.id) ? null : () => onToggle(s.id),
+          ),
+        if (more.isNotEmpty && onToggleMore != null)
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: EdgeInsets.zero,
+              title: Text(
+                'More from your archive (${more.length})',
+                style: TextStyle(
+                  color: tokens.ink,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              children: [
+                for (final s in more)
+                  _PlanScrapRow(
+                    scrap: s,
+                    reason: s.description,
+                    kept: added.contains(s.id),
+                    onTap: full && !added.contains(s.id)
+                        ? null
+                        : () => onToggleMore!(s.id),
+                  ),
+              ],
+            ),
           ),
         if (plan.captions.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -411,23 +470,11 @@ class PlanCards extends StatelessWidget {
             Text('“$caption”', style: tokens.hand(24)),
         ],
         if (plan.ephemera.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text('Decorations to make', style: tokens.display(18)),
-          const SizedBox(height: 8),
-          for (final (i, e) in plan.ephemera.indexed)
-            DecorationRow(
-              kind: e.kind,
-              prompt: e.prompt,
-              kept: !skippedDecorations.contains(i),
-              onTap: onToggleDecoration == null
-                  ? null
-                  : () => onToggleDecoration!(i),
-            ),
-          Text(
-            decorations == 0
-                ? 'No decorations: nothing extra to pay'
-                : '$decorations decoration${decorations == 1 ? '' : 's'} · ≈₱${(decorations * decorationCostPesos).toStringAsFixed(2)}',
-            style: TextStyle(color: tokens.inkSoft),
+          const SizedBox(height: 12),
+          _DecorationsSection(
+            plan: plan,
+            skipped: skippedDecorations,
+            onToggle: onToggleDecoration,
           ),
         ],
         const SizedBox(height: 20),
@@ -461,7 +508,9 @@ class _PlanScrapRow extends StatelessWidget {
   final Scrap? scrap;
   final String reason;
   final bool kept;
-  final VoidCallback onTap;
+
+  /// Null when the page is full and this row can't be ticked.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -508,6 +557,80 @@ class _PlanScrapRow extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The plan's AI decorations, folded away and off by default, grouped by
+/// kind (washi tape, stickers...) so they read as an optional extra.
+class _DecorationsSection extends StatelessWidget {
+  const _DecorationsSection({
+    required this.plan,
+    required this.skipped,
+    required this.onToggle,
+  });
+
+  static const _groups = {
+    'tape': 'Washi tape',
+    'sticker': 'Stickers',
+    'stamp': 'Stamps',
+    'label': 'Labels',
+    'ticket': 'Tickets',
+  };
+
+  final BlendPlan plan;
+  final Set<int> skipped;
+  final ValueChanged<int>? onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final picked = plan.ephemera.length - skipped.length;
+    final kinds = [
+      ..._groups.keys.where((k) => plan.ephemera.any((e) => e.kind == k)),
+      ...{
+        for (final e in plan.ephemera)
+          if (!_groups.containsKey(e.kind)) e.kind,
+      },
+    ];
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        title: Text(
+          'AI decorations (optional)',
+          style: TextStyle(color: tokens.ink, fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          picked == 0
+              ? 'Off · made with Muse Image if you add any'
+              : '$picked to make · ≈₱${(picked * decorationCostPesos).toStringAsFixed(2)}',
+          style: TextStyle(color: tokens.inkSoft),
+        ),
+        children: [
+          for (final kind in kinds) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 6),
+                child: Text(
+                  _groups[kind] ?? kind,
+                  style: TextStyle(color: tokens.inkSoft, fontSize: 13),
+                ),
+              ),
+            ),
+            for (final (i, e) in plan.ephemera.indexed)
+              if (e.kind == kind)
+                DecorationRow(
+                  kind: e.kind,
+                  prompt: e.prompt,
+                  kept: !skipped.contains(i),
+                  onTap: onToggle == null ? null : () => onToggle!(i),
+                ),
+          ],
+        ],
       ),
     );
   }
@@ -560,23 +683,10 @@ class DecorationRow extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: '$kind  ',
-                            style: TextStyle(
-                              color: tokens.ink,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          TextSpan(
-                            text: prompt,
-                            style: TextStyle(color: tokens.inkSoft),
-                          ),
-                        ],
-                      ),
-                      maxLines: 2,
+                    child: Text(
+                      prompt,
+                      style: TextStyle(color: tokens.ink),
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),

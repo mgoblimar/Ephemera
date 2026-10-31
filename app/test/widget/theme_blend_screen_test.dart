@@ -203,6 +203,18 @@ void main() {
     });
   }
 
+  /// Opens the folded AI decorations and switches the coffee stamp on.
+  Future<void> addDecoration(WidgetTester tester) async {
+    await tester.ensureVisible(find.text('AI decorations (optional)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('AI decorations (optional)'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('coffee stamp'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('coffee stamp'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('an empty theme shows a hint instead of calling the agent', (
     tester,
   ) async {
@@ -231,11 +243,15 @@ void main() {
     expect((sent['archive'] as List), hasLength(3));
     expect(find.text('Slow Sunday'), findsOneWidget);
     expect(find.text('The café receipt sets the morning.'), findsOneWidget);
-    expect(
-      find.textContaining('coffee stamp', findRichText: true),
-      findsOneWidget,
-    );
-    expect(find.text('1 decoration · ≈₱0.64'), findsOneWidget);
+    // AI decorations are folded away and off until asked for.
+    expect(find.text('AI decorations (optional)'), findsOneWidget);
+    expect(find.textContaining('Off ·'), findsOneWidget);
+    expect(find.text('Build page with 2 scraps'), findsOneWidget);
+
+    await addDecoration(tester);
+
+    expect(find.text('Stamps'), findsOneWidget);
+    expect(find.text('1 to make · ≈₱0.64'), findsOneWidget);
     expect(
       find.text('Build page with 2 scraps + 1 decoration'),
       findsOneWidget,
@@ -252,14 +268,6 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('The bus ride there.'));
-    await tester.pump();
-    await tester.ensureVisible(
-      find.textContaining('coffee stamp', findRichText: true),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.textContaining('coffee stamp', findRichText: true),
-    ); // and skip the decoration
     await tester.pump();
     expect(find.text('Build page with 1 scrap'), findsOneWidget);
     await tester.ensureVisible(find.text('Build page with 1 scrap'));
@@ -285,6 +293,36 @@ void main() {
     expect(log.where((r) => r.url.path == '/agent/ephemera'), isEmpty);
   });
 
+  testWidgets('a scrap the agent skipped can be ticked in More and is built', (
+    tester,
+  ) async {
+    final log = <http.Request>[];
+    final repository = await pumpBlend(tester, log);
+    await tester.enterText(find.byType(TextField), 'slow sunday');
+    await tester.tap(find.text('Plan a page'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2 of 3 ticked'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('More from your archive (1)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('More from your archive (1)'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('wrapper'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('wrapper'));
+    await tester.pumpAndSettle();
+    const build = 'Build page with 3 scraps';
+    await tester.ensureVisible(find.text(build));
+    await tester.pumpAndSettle();
+
+    final journal = await buildAndWait(tester, build, repository);
+
+    final placed = journal!.pages.last.elements
+        .where((e) => e.kind == ElementKind.scrap)
+        .map((e) => e.scrapId);
+    expect(placed, containsAll(['r1', 't1', 'w1']));
+  });
+
   testWidgets('building makes the decoration, saves it and places it', (
     tester,
   ) async {
@@ -293,6 +331,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'slow sunday');
     await tester.tap(find.text('Plan a page'));
     await tester.pumpAndSettle();
+    await addDecoration(tester);
     const build = 'Build page with 2 scraps + 1 decoration';
     await tester.ensureVisible(find.text(build));
     await tester.pumpAndSettle();
@@ -328,6 +367,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'slow sunday');
     await tester.tap(find.text('Plan a page'));
     await tester.pumpAndSettle();
+    await addDecoration(tester);
     const build = 'Build page with 2 scraps + 1 decoration';
     await tester.ensureVisible(find.text(build));
     await tester.pumpAndSettle();

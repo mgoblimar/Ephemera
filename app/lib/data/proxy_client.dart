@@ -18,6 +18,9 @@ const _slowRequestTimeout = Duration(seconds: 90);
 const _agentTimeout = Duration(seconds: 150);
 
 /// Error from the proxy, carrying its envelope code and a user-facing message.
+/// Scraps one layout request can hold: up to 15 scraps plus 4 decorations.
+const maxLayoutScraps = 20;
+
 class ProxyException implements Exception {
   const ProxyException(this.code, this.message);
 
@@ -138,7 +141,7 @@ class ProxyClient {
       'layout_intent': plan.layoutIntent,
       'paper': plan.paper,
       'scraps': [
-        for (final s in scraps.take(12))
+        for (final s in scraps.take(maxLayoutScraps))
           {
             'id': s.id,
             'aspect': s.height / s.width,

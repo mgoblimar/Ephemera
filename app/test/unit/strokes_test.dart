@@ -80,4 +80,32 @@ void main() {
 
     expect(text.toJson().containsKey('points'), isFalse);
   });
+
+  test('the eraser picks only strokes it passes over', () {
+    final near = stroke(const [Offset(100, 100), Offset(200, 100)]);
+    final far = strokeElement(
+      id: 'far',
+      points: const [Offset(100, 400), Offset(200, 400)],
+      pageSize: page,
+      thickness: 4,
+      color: Colors.black,
+    )!;
+
+    final erased = strokesErasedBy(
+      [near, far],
+      const [Offset(150, 80), Offset(150, 120)],
+      page,
+    );
+
+    expect(erased, {'s1'});
+  });
+
+  test('the eraser follows a stroke that was moved and turned', () {
+    final e = stroke(const [Offset(100, 100), Offset(200, 100)]);
+    // Turned a quarter around its centre (150, 100): now runs top to bottom.
+    final turned = e.copyWith(rotation: 1.5708);
+
+    expect(strokesErasedBy([turned], const [Offset(150, 60)], page), {'s1'});
+    expect(strokesErasedBy([turned], const [Offset(110, 100)], page), isEmpty);
+  });
 }

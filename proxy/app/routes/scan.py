@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from PIL import Image
 from pydantic import BaseModel, Field
 
+from app.box_filter import clean_boxes, not_whole_scrap
 from app.config import Settings
 from app.contact_sheet import Piece, SheetCell, build_sheet, mask_for_piece
 from app.envelope import ApiError, ok
@@ -73,7 +74,7 @@ async def detect(
     original = await deps.read_image_upload(image, config, max_side=config.max_original_side)
     photo = original.copy()
     photo.thumbnail((config.max_image_side, config.max_image_side))
-    items = models.segmentation.detect_items(photo)
+    items = clean_boxes(models.segmentation.detect_items(photo))
     image_id = store.put(photo, original=original)
     piece_ids = store.add_pieces(image_id, items)
     return ok(
@@ -113,8 +114,11 @@ def split(
     view_scale = close_up.width / model_view.width
 
     found = [(e.label, _offset(e.box, view_scale, whole)) for e in models.segmentation.detect_elements(model_view)]
+    found = [(e.label, e.box) for e in clean_boxes([DetectedItem(label, box) for label, box in found])]
     elements = [
-        DetectedItem(label=label, box=_to_working(entry, box)) for label, box in found if _big_enough(box, whole)
+        DetectedItem(label=label, box=_to_working(entry, box))
+        for label, box in found
+        if _big_enough(box, whole) and not_whole_scrap(box, whole)
     ]
     element_ids = store.add_pieces(body.image_id, elements)
     return ok(
