@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'package:ephemera_ai/features/blend/theme_blend_screen.dart';
 import 'package:ephemera_ai/features/editor/editor_screen.dart';
 import 'package:ephemera_ai/features/editor/page_canvas.dart';
+import 'package:ephemera_ai/features/library/book_look.dart';
 import 'package:ephemera_ai/models/journal.dart';
 import 'package:ephemera_ai/providers.dart';
 import 'package:ephemera_ai/theme.dart';
@@ -45,6 +46,14 @@ class _BookScreenState extends ConsumerState<BookScreen> {
     _edit(updated, page.id);
   }
 
+  Future<void> _changeLook(Journal journal) async {
+    final changed = await pickBookLook(context, journal);
+    if (changed == null) return;
+    final repository = await ref.read(journalRepositoryProvider.future);
+    await repository.save(changed);
+    ref.invalidate(journalsProvider);
+  }
+
   void _edit(Journal journal, String pageId) {
     Navigator.push(
       context,
@@ -64,14 +73,21 @@ class _BookScreenState extends ConsumerState<BookScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final pageCount = journal.pages.length;
-    final paper = context.tokens.paper;
+    final cover = Color(journal.coverColor);
+    final paper = BookBackdropView.onBackdrop(journal.backdrop, cover);
     return Scaffold(
-      backgroundColor: Color(journal.coverColor),
+      backgroundColor: BookBackdropView.base(journal.backdrop, cover),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(journal.title, style: TextStyle(color: paper)),
-        backgroundColor: Color(journal.coverColor),
+        backgroundColor: Colors.transparent,
         foregroundColor: paper,
         actions: [
+          IconButton(
+            tooltip: 'Book style and background',
+            onPressed: () => _changeLook(journal),
+            icon: const Icon(Icons.style_outlined),
+          ),
           TextButton.icon(
             onPressed: () => Navigator.push(
               context,
@@ -85,36 +101,43 @@ class _BookScreenState extends ConsumerState<BookScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: pageCount + 1, // + the "add page" leaf
-                onPageChanged: (i) => setState(() => _index = i),
-                itemBuilder: (context, i) => _FlipLeaf(
+      body: BookBackdropView(
+        backdrop: journal.backdrop,
+        coverColor: cover,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: PageView.builder(
                   controller: _controller,
-                  index: i,
-                  child: i == pageCount
-                      ? _AddPageLeaf(onTap: () => _addPage(journal))
-                      : GestureDetector(
-                          onTap: () => _edit(journal, journal.pages[i].id),
-                          child: JournalPageCanvas(page: journal.pages[i]),
-                        ),
+                  itemCount: pageCount + 1, // + the "add page" leaf
+                  onPageChanged: (i) => setState(() => _index = i),
+                  itemBuilder: (context, i) => _FlipLeaf(
+                    controller: _controller,
+                    index: i,
+                    child: i == pageCount
+                        ? _AddPageLeaf(onTap: () => _addPage(journal))
+                        : GestureDetector(
+                            onTap: () => _edit(journal, journal.pages[i].id),
+                            child: BindingEdge(
+                              binding: journal.binding,
+                              child: JournalPageCanvas(page: journal.pages[i]),
+                            ),
+                          ),
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                _index < pageCount
-                    ? 'Page ${_index + 1} of $pageCount · tap to edit'
-                    : 'Add a page',
-                style: TextStyle(color: paper),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _index < pageCount
+                      ? 'Page ${_index + 1} of $pageCount · tap to edit'
+                      : 'Add a page',
+                  style: TextStyle(color: paper),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

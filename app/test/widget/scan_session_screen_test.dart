@@ -121,6 +121,39 @@ void main() {
     expect(sent.map((p) => (p as Map)['piece_id']), ['p0']);
   });
 
+  testWidgets('photos are sent for auto-enhance by default', (tester) async {
+    final log = <http.Request>[];
+    await tester.pumpWidget(_app(_proxy(log), FileScrapRepository(root)));
+    await tester.pumpAndSettle();
+
+    final detect = log.firstWhere((r) => r.url.path == '/scan/detect');
+    // Multipart bytes include the photo, so read them as Latin-1, not UTF-8.
+    final body = latin1.decode(detect.bodyBytes);
+    expect(body, matches(RegExp(r'name="enhance"\s+true')));
+    expect(find.byTooltip('Auto-enhance on (for new photos)'), findsOneWidget);
+  });
+
+  testWidgets('the outline switch gives one piece its own cut style', (
+    tester,
+  ) async {
+    final log = <http.Request>[];
+    final repository = FileScrapRepository(root);
+    await tester.pumpWidget(_app(_proxy(log), repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('No outline').first);
+    await tester.pump();
+    expect(find.text('Outline'), findsOneWidget);
+
+    await _cutAndWait(tester, 'Cut & save 2', repository, 2);
+    final cut = log.singleWhere((r) => r.url.path == '/scan/cut');
+    final body = jsonDecode(cut.body) as Map;
+    final sent = (body['pieces'] as List).cast<Map>();
+    expect(body['cut_style'], 'tight');
+    expect(sent.first['cut_style'], 'sticker');
+    expect(sent.last.containsKey('cut_style'), isFalse);
+  });
+
   testWidgets(
     'pieces from two photos are cut in one request and saved per photo',
     (tester) async {

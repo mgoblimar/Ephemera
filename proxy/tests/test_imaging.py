@@ -161,3 +161,29 @@ def test_solidity_is_high_for_a_whole_piece_and_low_for_fragments() -> None:
 
 def test_solidity_of_an_empty_mask_is_zero() -> None:
     assert mask_solidity(np.zeros((50, 50), dtype=np.float32)) == 0.0
+
+
+def test_auto_enhance_softens_a_colour_cast_and_stretches_contrast() -> None:
+    from app.imaging import auto_enhance
+
+    rng = np.random.default_rng(0)
+    grey = rng.uniform(90, 150, (60, 80, 1))
+    dull_blue = np.concatenate([grey * 0.9, grey * 0.95, grey * 1.1], axis=2).clip(0, 255).astype(np.uint8)
+
+    fixed = np.asarray(auto_enhance(Image.fromarray(dull_blue, "RGB")), dtype=np.float32)
+
+    before_means = dull_blue.reshape(-1, 3).mean(axis=0)
+    after_means = fixed.reshape(-1, 3).mean(axis=0)
+    assert np.ptp(after_means) < np.ptp(before_means)  # channels closer together
+    assert np.ptp(fixed) > np.ptp(dull_blue.astype(np.float32))  # wider tonal range
+
+
+def test_auto_enhance_never_overcorrects_a_strongly_coloured_photo() -> None:
+    from app.imaging import MAX_CAST_CORRECTION, auto_enhance
+
+    brown_desk = Image.new("RGB", (40, 40), (160, 110, 70))
+
+    r, g, b = auto_enhance(brown_desk).getpixel((0, 0))
+
+    assert r > g > b  # still brown, not pushed to grey
+    assert b <= 70 * (1 + MAX_CAST_CORRECTION) + 1

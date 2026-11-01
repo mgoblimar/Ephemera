@@ -507,7 +507,7 @@ Solo build: features are built **vertically** (app screen + its proxy endpoint t
 
 **Batch A, built Oct 31:** remove several scraps at once (long-press to select; also set status in bulk); the undo message closes after 4 s; pen eraser; AI decorations opt-in, folded and grouped (washi tape / stickers / stamps / labels); Theme Blend offers up to 15 scraps pre-ticked plus "More from your archive"; archive filters in the editor's scrap picker; "Used in" note filled from the newest journal page holding the scrap.
 
-**Batch B, before the freeze:** Open Sauce font (bundled; not on Google Fonts), general UI pass (Jen sending inspiration), book background choice + notebook/booklet flip style, outline on/off per piece when cutting, auto-enhance photos (brightness/contrast/colour on the proxy, no API cost), generated washi tape as a straight strip.
+**Batch B, built Nov 1 except the UI pass (waiting for Jen's inspiration):** Open Sauce font (bundled; not on Google Fonts), general UI pass (Jen sending inspiration), book background choice + notebook/booklet flip style, outline on/off per piece when cutting, auto-enhance photos (brightness/contrast/colour on the proxy, no API cost), generated washi tape as a straight strip.
 
 **After the hackathon:** touch to add/delete a figure (SAM point refinement, 4.1c), manual crop / lasso / auto-crop / shapes, refine edges, better Split (fine-tune, 8.1).
 

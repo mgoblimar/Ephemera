@@ -63,6 +63,18 @@ def test_cutouts_use_the_full_resolution_photo(client: TestClient) -> None:
     assert scrap["width"] > piece["box"][2] * 1.8
 
 
+def test_a_piece_can_have_its_own_cut_style(client: TestClient) -> None:
+    data = _detect(client)
+    ref = {"image_id": data["image_id"], "piece_id": data["pieces"][0]["id"]}
+
+    cut = client.post(
+        "/scan/cut", json={"pieces": [ref, {**ref, "cut_style": "sticker"}], "cut_style": "tight"}
+    ).json()["data"]["scraps"]
+
+    tight, sticker = cut
+    assert sticker["width"] > tight["width"]  # the sticker cut adds a white outline
+
+
 def test_split_returns_elements_inside_the_parent_piece(client: TestClient) -> None:
     data = _detect(client, (3000, 2000))
     parent = data["pieces"][1]
@@ -153,3 +165,14 @@ def test_broken_cutouts_are_reported_as_rough_instead_of_saved(client: TestClien
 
     assert [s["piece_id"] for s in data["scraps"]] == [photo["pieces"][0]["id"], photo["pieces"][2]["id"]]
     assert data["missed"] == [{**refs[1], "reason": "rough"}]
+
+
+def test_detect_can_skip_auto_enhance(client: TestClient) -> None:
+    response = client.post(
+        "/scan/detect",
+        files={"image": ("desk.png", photo_bytes((1200, 900), fmt="PNG"), "image/png")},
+        data={"enhance": "false"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["pieces"]

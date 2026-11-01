@@ -30,6 +30,12 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
   List<SessionPhoto> _photos = const [];
   Set<String> _chosen = const {};
   CutStyle _style = CutStyle.tight;
+
+  /// Auto-enhance photos (brightness, contrast, colour) as they're added.
+  bool _enhance = true;
+
+  /// Per-piece outline switches (by piece key); unset follows [_style].
+  Map<String, bool> _outline = const {};
   CutSize _size = CutSize.m;
   bool _cutting = false;
 
@@ -70,6 +76,7 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
       final scan = await _proxy.scanDetect(
         photo.bytes,
         filename: photo.filename,
+        enhance: _enhance,
       );
       if (!mounted) return;
       _replace(photo.withScan(scan));
@@ -157,6 +164,19 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
     });
   }
 
+  bool _isOutlined(ScanPiece piece) =>
+      _outline[piece.key] ?? _style == CutStyle.sticker;
+
+  /// Outline on is a sticker cut; off keeps the chosen style (tight if that
+  /// was Sticker).
+  CutStyle _styleFor(ScanPiece piece) => _isOutlined(piece)
+      ? CutStyle.sticker
+      : (_style == CutStyle.sticker ? CutStyle.tight : _style);
+
+  void _toggleOutline(ScanPiece piece) => setState(() {
+    _outline = Map.unmodifiable({..._outline, piece.key: !_isOutlined(piece)});
+  });
+
   Future<void> _cutAndSave() async {
     final pieces = _chosenPieces;
     if (pieces.isEmpty) return;
@@ -166,6 +186,10 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
         pieces: pieces,
         style: _style,
         size: _size,
+        pieceStyles: {
+          for (final p in pieces)
+            if (_outline.containsKey(p.key)) p.key: _styleFor(p),
+        },
       );
       final saved = await _saveByPhoto(result);
       if (!mounted) return;
@@ -250,7 +274,20 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan session')),
+      appBar: AppBar(
+        title: const Text('Scan session'),
+        actions: [
+          IconButton(
+            tooltip: _enhance
+                ? 'Auto-enhance on (for new photos)'
+                : 'Auto-enhance off (for new photos)',
+            isSelected: _enhance,
+            onPressed: () => setState(() => _enhance = !_enhance),
+            icon: const Icon(Icons.auto_fix_off),
+            selectedIcon: const Icon(Icons.auto_fix_high),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Stack(
           children: [
@@ -288,6 +325,8 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
                         splitting: _splitting,
                         alreadySplit: _alreadySplit,
                         onSplit: (piece) => _split(photo, piece),
+                        isOutlined: _isOutlined,
+                        onOutline: _toggleOutline,
                       ),
                   ],
                 ),
@@ -297,7 +336,11 @@ class _ScanSessionScreenState extends ConsumerState<ScanSessionScreen> {
           style: _style,
           size: _size,
           cutting: _cutting,
-          onStyle: (s) => setState(() => _style = s),
+          // A new style for the batch resets the per-piece switches.
+          onStyle: (s) => setState(() {
+            _style = s;
+            _outline = const {};
+          }),
           onSize: (s) => setState(() => _size = s),
           onAddPhoto: _cutting ? null : _addPhoto,
           onCut: _cutAndSave,

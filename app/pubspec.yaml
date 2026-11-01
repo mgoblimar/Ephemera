@@ -25,3 +25,16 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/OpenSauceSans-OFL.txt
+  # Open Sauce Sans (SIL Open Font License), bundled: it isn't on Google Fonts.
+  fonts:
+    - family: Open Sauce Sans
+      fonts:
+        - asset: assets/fonts/OpenSauceSans-Regular.ttf
+        - asset: assets/fonts/OpenSauceSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/OpenSauceSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/OpenSauceSans-Bold.ttf
+          weight: 700

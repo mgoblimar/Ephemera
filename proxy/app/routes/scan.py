@@ -9,7 +9,7 @@ import base64
 from typing import Annotated, Any
 
 import numpy as np
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from PIL import Image
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,7 @@ from app.envelope import ApiError, ok
 from app.image_store import ImageStore, StoredImage
 from app.imaging import (
     ROUGH_SOLIDITY,
+    auto_enhance,
     CutSize,
     CutStyle,
     apply_cut_style,
@@ -46,6 +47,7 @@ MIN_ELEMENT_AREA_FRACTION = 0.02  # of the parent piece's area
 class PieceRef(BaseModel):
     image_id: str = Field(min_length=1, max_length=64)
     piece_id: str = Field(min_length=1, max_length=64)
+    cut_style: CutStyle | None = None  # this piece's own style (e.g. outline on/off); default: the request's
 
 
 class CutRequest(BaseModel):
@@ -70,8 +72,11 @@ async def detect(
     config: Annotated[Settings, Depends(deps.settings)],
     models: Annotated[Providers, Depends(deps.providers)],
     store: Annotated[ImageStore, Depends(deps.image_store)],
+    enhance: Annotated[bool, Form()] = True,
 ) -> dict[str, Any]:
     original = await deps.read_image_upload(image, config, max_side=config.max_original_side)
+    if enhance:
+        original = auto_enhance(original)  # cut-outs come from this copy, so they look better too
     photo = original.copy()
     photo.thumbnail((config.max_image_side, config.max_image_side))
     items = clean_boxes(models.segmentation.detect_items(photo))
@@ -202,14 +207,15 @@ def cut(
         masks = models.segmentation.segment_boxes(sheet.image, [cell.prompt_box for cell in sheet.cells])
         for (ref, _, label, piece), cell, mask in zip(batch, sheet.cells, masks, strict=True):
             if mask is None:
-                missed.append({**ref.model_dump(), "reason": "not_found"})
+                missed.append({"image_id": ref.image_id, "piece_id": ref.piece_id, "reason": "not_found"})
                 continue
             alpha = clean_mask(mask_for_piece(mask.alpha, cell))
             if mask_solidity(alpha) < ROUGH_SOLIDITY:
                 # Half-hidden or torn pieces come back as fragments; don't save junk.
-                missed.append({**ref.model_dump(), "reason": "rough"})
+                missed.append({"image_id": ref.image_id, "piece_id": ref.piece_id, "reason": "rough"})
                 continue
-            scraps.append(_scrap_json(ref, label, piece, cell, alpha, body.cut_style, body.cut_size))
+            style = ref.cut_style or body.cut_style
+            scraps.append(_scrap_json(ref, label, piece, cell, alpha, style, body.cut_size))
     return ok({"scraps": scraps, "missed": missed, "sam_requests": len(batches)})
 
 

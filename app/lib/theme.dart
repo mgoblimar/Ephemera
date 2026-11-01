@@ -137,7 +137,7 @@ const deskTokens = EphemeraTokens(
   secondary: Palette.moss,
   tape: Palette.washi,
   displayFont: 'Fraunces',
-  bodyFont: 'Nunito Sans',
+  bodyFont: openSauce,
   handFont: 'Caveat',
   cardRadius: 10,
   scrapTilt: 0.06,
@@ -162,7 +162,7 @@ const cozyCatTokens = EphemeraTokens(
   secondary: Color(0xFF5E9C86),
   tape: Color(0xCCB9D7EA),
   displayFont: 'Fredoka',
-  bodyFont: 'Nunito',
+  bodyFont: openSauce,
   handFont: 'Gaegu',
   cardRadius: 22,
   scrapTilt: 0.09,
@@ -182,8 +182,13 @@ extension EphemeraThemeContext on BuildContext {
       Theme.of(this).extension<EphemeraTokens>() ?? deskTokens;
 }
 
+/// The app's UI font (Jen's pick, as in Canva). Bundled with the app, so it
+/// never goes through Google Fonts.
+const openSauce = 'Open Sauce Sans';
+const _bundledFonts = {openSauce};
+
 TextStyle _font(String family, double size, Color color, FontWeight weight) {
-  if (!useGoogleFonts) {
+  if (!useGoogleFonts || _bundledFonts.contains(family)) {
     return TextStyle(
       fontFamily: family,
       fontSize: size,
@@ -208,7 +213,9 @@ ThemeData buildTheme([EphemeraTokens tokens = deskTokens]) {
     onSurface: tokens.ink,
   );
   final base = ThemeData(colorScheme: scheme, useMaterial3: true);
-  final body = useGoogleFonts
+  final body = _bundledFonts.contains(tokens.bodyFont)
+      ? base.textTheme.apply(fontFamily: tokens.bodyFont)
+      : useGoogleFonts
       ? GoogleFonts.getTextTheme(tokens.bodyFont, base.textTheme)
       : base.textTheme;
   final textTheme = body.copyWith(

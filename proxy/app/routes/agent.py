@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from app.agent.archive_search import ScrapSummary
 from app.agent.layout import LayoutScrap
 from app.envelope import ApiError, ok
-from app.ephemera import ephemera_prompt, lift_off_background
+from app.ephemera import ephemera_prompt, level_strip, lift_off_background
 from app.imaging import dominant_palette, png_bytes
 from app.providers import Providers
 from app.routes import deps
@@ -81,6 +81,8 @@ def ephemera(body: EphemeraRequest, models: Annotated[Providers, Depends(deps.pr
     """Generate one decoration with Muse Image and return it as a cut-out (~₱0.64)."""
     picture = models.image.generate(ephemera_prompt(body.kind, body.prompt, body.palette))
     cut = lift_off_background(picture)
+    if body.kind == "tape":
+        cut = level_strip(cut)  # straight tape is easy to turn and stretch on a page
     return ok(
         {
             "kind": body.kind,

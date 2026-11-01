@@ -33,6 +33,9 @@ ISLAND_KEEP_FRACTION = 0.15
 # on 76 real cutouts every one below 0.6 was junk, while curvy pieces (a bow) scored 0.72+.
 ROUGH_SOLIDITY = 0.6
 SOLIDITY_STRIDE = 4  # sample every 4th pixel; plenty for a shape measure
+# Auto-enhance: colour-cast correction is capped so a brown desk doesn't turn blue.
+MAX_CAST_CORRECTION = 0.12
+CONTRAST_CUTOFF = 0.5  # % of darkest / brightest pixels clipped when stretching contrast
 
 
 def load_upload(data: bytes, max_bytes: int, max_side: int, keep_alpha: bool = False) -> Image.Image:
@@ -53,6 +56,16 @@ def load_upload(data: bytes, max_bytes: int, max_side: int, keep_alpha: bool = F
     upright = ImageOps.exif_transpose(image).convert("RGBA" if keep_alpha else "RGB")
     upright.thumbnail((max_side, max_side))
     return upright
+
+
+def auto_enhance(image: Image.Image) -> Image.Image:
+    """Gentle photo fix-up before scanning: soften a colour cast (warm lamp, blue shade), then
+    stretch brightness and contrast without shifting hues. Free and local."""
+    rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
+    means = rgb.reshape(-1, 3).mean(axis=0)
+    gains = np.clip(means.mean() / np.maximum(means, 1.0), 1 - MAX_CAST_CORRECTION, 1 + MAX_CAST_CORRECTION)
+    balanced = Image.fromarray((rgb * gains).clip(0, 255).astype(np.uint8), "RGB")
+    return ImageOps.autocontrast(balanced, cutoff=CONTRAST_CUTOFF, preserve_tone=True)
 
 
 def mask_bbox(alpha: np.ndarray, threshold: float = MASK_THRESHOLD) -> tuple[int, int, int, int] | None:

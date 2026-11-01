@@ -191,14 +191,18 @@ class ProxyClient {
   }
 
   /// Detect pieces in a photo without cutting them (cheap: no SAM call).
+  /// [enhance] lets the proxy fix brightness, contrast and colour cast first
+  /// (free; the cut-outs come from the fixed photo too).
   Future<ScanPhoto> scanDetect(
     Uint8List photo, {
     String filename = 'photo.jpg',
+    bool enhance = true,
   }) async {
     final request = http.MultipartRequest('POST', _uri('/scan/detect'))
       ..files.add(
         http.MultipartFile.fromBytes('image', photo, filename: filename),
-      );
+      )
+      ..fields['enhance'] = '$enhance';
     final data = await _send(
       () async => http.Response.fromStream(await _http.send(request)),
       timeout: _slowRequestTimeout,
@@ -259,14 +263,21 @@ class ProxyClient {
   }
 
   /// Cut the chosen pieces; the proxy packs up to 16 per SAM request.
+  /// [pieceStyles] (by piece key) overrides [style] for single pieces.
   Future<ScanCutResult> scanCut({
     required List<ScanPiece> pieces,
     required CutStyle style,
     required CutSize size,
+    Map<String, CutStyle> pieceStyles = const {},
   }) async {
     final data = await _postJson('/scan/cut', {
       'pieces': [
-        for (final p in pieces) {'image_id': p.imageId, 'piece_id': p.id},
+        for (final p in pieces)
+          {
+            'image_id': p.imageId,
+            'piece_id': p.id,
+            if (pieceStyles[p.key] case final own?) 'cut_style': own.name,
+          },
       ],
       'cut_style': style.name,
       'cut_size': size.name,

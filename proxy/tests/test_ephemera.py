@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 
 from app.envelope import ApiError
-from app.ephemera import ephemera_prompt, lift_off_background
+from app.ephemera import ephemera_prompt, level_strip, lift_off_background
 
 
 def _alpha(image: Image.Image) -> np.ndarray:
@@ -87,3 +87,25 @@ def test_a_dashed_outline_keeps_its_near_white_inside() -> None:
     h, w = alpha.shape
     assert alpha[h // 4, w // 4] > 220  # plain cream paper inside the outline stays
     assert alpha[0, 0] < 30
+
+
+def _strip(angle_deg: float) -> Image.Image:
+    """A 300x40 opaque strip on a transparent canvas, turned by angle_deg."""
+    strip = Image.new("RGBA", (300, 40), (200, 120, 140, 255))
+    canvas = Image.new("RGBA", (500, 500), (0, 0, 0, 0))
+    canvas.paste(strip, (100, 230))
+    return canvas.rotate(angle_deg, expand=True)
+
+
+@pytest.mark.parametrize("angle", [30, -25, 80])
+def test_a_tilted_tape_strip_is_turned_level(angle: float) -> None:
+    level = level_strip(_strip(angle))
+
+    assert level.width > 6 * level.height
+    assert abs(level.width - 300) < 12 and abs(level.height - 40) < 12
+
+
+def test_a_level_strip_is_left_as_it_is() -> None:
+    strip = _strip(0)
+
+    assert level_strip(strip) is strip

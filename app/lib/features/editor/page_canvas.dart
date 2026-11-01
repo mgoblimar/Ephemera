@@ -352,6 +352,26 @@ class PaperPainter extends CustomPainter {
       case PaperStyle.dots:
         canvas.drawRect(rect, Paint()..color = _cream);
         _dots(canvas, size);
+      case PaperStyle.lined:
+        canvas.drawRect(rect, Paint()..color = _cream);
+        _lines(canvas, size, grid: false);
+      case PaperStyle.grid:
+        canvas.drawRect(rect, Paint()..color = _cream);
+        _lines(canvas, size, grid: true);
+    }
+  }
+
+  void _lines(Canvas canvas, Size size, {required bool grid}) {
+    final gap = size.width / (grid ? 18 : 14);
+    final paint = Paint()
+      ..color = _dotColor
+      ..strokeWidth = math.max(0.6, size.width / 700);
+    for (var y = gap * (grid ? 1 : 2); y < size.height; y += gap) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+    if (!grid) return;
+    for (var x = gap; x < size.width; x += gap) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
   }
 

@@ -5,7 +5,38 @@ library;
 /// Page aspect ratio, height / width (A5 portrait).
 const pageAspect = 1.414;
 
-enum PaperStyle { cream, kraft, dots }
+enum PaperStyle {
+  cream('Cream'),
+  kraft('Kraft'),
+  dots('Dots'),
+  lined('Lined'),
+  grid('Grid');
+
+  const PaperStyle(this.label);
+  final String label;
+}
+
+/// How the journal is bound in the book view.
+enum BookBinding {
+  book('Book'),
+  notebook('Notebook'),
+  booklet('Booklet');
+
+  const BookBinding(this.label);
+  final String label;
+}
+
+/// What the book lies on in the book view.
+enum BookBackdrop {
+  cover('Cover colour'),
+  wood('Wood'),
+  linen('Linen'),
+  cork('Cork'),
+  kraft('Kraft');
+
+  const BookBackdrop(this.label);
+  final String label;
+}
 
 enum ElementKind { scrap, text, stroke }
 
@@ -202,6 +233,8 @@ class Journal {
     required this.createdAt,
     this.coverColor = 0xFFB5603F,
     this.pages = const [],
+    this.binding = BookBinding.book,
+    this.backdrop = BookBackdrop.cover,
   });
 
   final String id;
@@ -209,6 +242,8 @@ class Journal {
   final DateTime createdAt;
   final int coverColor;
   final List<JournalPage> pages;
+  final BookBinding binding;
+  final BookBackdrop backdrop;
 
   Journal withPages(List<JournalPage> pages) => Journal(
     id: id,
@@ -216,6 +251,28 @@ class Journal {
     createdAt: createdAt,
     coverColor: coverColor,
     pages: List.unmodifiable(pages),
+    binding: binding,
+    backdrop: backdrop,
+  );
+
+  /// The same paper on every page.
+  Journal withPaperEverywhere(PaperStyle paper) =>
+      withPages([for (final p in pages) p.withPaper(paper)]);
+
+  /// The paper all pages share, or null when they differ (or there are none).
+  PaperStyle? get sharedPaper {
+    final papers = {for (final p in pages) p.paper};
+    return papers.length == 1 ? papers.single : null;
+  }
+
+  Journal withLook({BookBinding? binding, BookBackdrop? backdrop}) => Journal(
+    id: id,
+    title: title,
+    createdAt: createdAt,
+    coverColor: coverColor,
+    pages: pages,
+    binding: binding ?? this.binding,
+    backdrop: backdrop ?? this.backdrop,
   );
 
   Journal replacingPage(JournalPage page) =>
@@ -226,6 +283,8 @@ class Journal {
     'title': title,
     'created_at': createdAt.toIso8601String(),
     'cover_color': coverColor,
+    'binding': binding.name,
+    'backdrop': backdrop.name,
     'pages': [for (final p in pages) p.toJson()],
   };
 
@@ -234,6 +293,10 @@ class Journal {
     title: json['title'] as String,
     createdAt: DateTime.parse(json['created_at'] as String),
     coverColor: json['cover_color'] as int? ?? 0xFFB5603F,
+    binding:
+        BookBinding.values.asNameMap()[json['binding']] ?? BookBinding.book,
+    backdrop:
+        BookBackdrop.values.asNameMap()[json['backdrop']] ?? BookBackdrop.cover,
     pages: List.unmodifiable(
       (json['pages'] as List<dynamic>? ?? const []).map(
         (p) => JournalPage.fromJson(p as Map<String, dynamic>),

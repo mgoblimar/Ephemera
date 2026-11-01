@@ -151,4 +151,28 @@ void main() {
       expect(await repository.getAll(), isEmpty);
     });
   });
+
+  test(
+    'book style and background survive a save, and old journals default',
+    () {
+      final journal = Journal(
+        id: 'j',
+        title: 'Kyoto',
+        createdAt: DateTime.utc(2026, 11, 1),
+      ).withLook(binding: BookBinding.notebook, backdrop: BookBackdrop.cork);
+
+      final loaded = Journal.fromJson(journal.toJson());
+      expect(loaded.binding, BookBinding.notebook);
+      expect(loaded.backdrop, BookBackdrop.cork);
+      expect(loaded.withPages(const []).binding, BookBinding.notebook);
+
+      final old = Journal.fromJson({
+        'id': 'o',
+        'title': 'Old',
+        'created_at': '2026-10-30T00:00:00Z',
+      });
+      expect(old.binding, BookBinding.book);
+      expect(old.backdrop, BookBackdrop.cover);
+    },
+  );
 }

@@ -40,9 +40,15 @@ class PhotoSection extends StatelessWidget {
     required this.splitting,
     required this.alreadySplit,
     required this.onSplit,
+    this.isOutlined,
+    this.onOutline,
   });
 
   final SessionPhoto photo;
+
+  /// Whether a piece will be cut with a white outline; null hides the switch.
+  final bool Function(ScanPiece)? isOutlined;
+  final ValueChanged<ScanPiece>? onOutline;
   final Set<String> chosen;
   final ValueChanged<ScanPiece> onToggle;
 
@@ -130,6 +136,10 @@ class PhotoSection extends StatelessWidget {
                     ),
                     splitting: splitting.contains(piece.key),
                     onSplit: _splitAction(piece),
+                    outlined: isOutlined?.call(piece),
+                    onOutline: onOutline == null
+                        ? null
+                        : () => onOutline!(piece),
                   ),
                 ),
                 // Placeholders where the split elements will land.
@@ -190,9 +200,15 @@ class PieceTile extends StatelessWidget {
     this.onPreview,
     this.splitting = false,
     this.onSplit,
+    this.outlined,
+    this.onOutline,
   });
 
   final ScanPiece piece;
+
+  /// Whether it will be cut with a white outline; null hides the switch.
+  final bool? outlined;
+  final VoidCallback? onOutline;
   final bool chosen;
   final VoidCallback onTap;
 
@@ -300,6 +316,43 @@ class PieceTile extends StatelessWidget {
                 backgroundColor: Colors.black.withValues(alpha: 0.35),
               ),
               icon: const Icon(Icons.zoom_in, size: 18, color: Colors.white),
+            ),
+          ),
+        if (outlined != null && onOutline != null)
+          Positioned(
+            bottom: 2,
+            left: 2,
+            child: Tooltip(
+              message: outlined! ? 'Outline on' : 'Outline off',
+              child: Semantics(
+                label: 'Outline',
+                toggled: outlined,
+                button: true,
+                child: InkWell(
+                  onTap: onOutline,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: outlined!
+                          ? Colors.white
+                          : Colors.black.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    child: Text(
+                      outlined! ? 'Outline' : 'No outline',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: outlined! ? tokens.ink : Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         Positioned(
